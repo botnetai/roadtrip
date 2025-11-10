@@ -8,10 +8,11 @@ import Security
 
 class AuthService {
     static let shared = AuthService()
-    
+
     private let tokenKey = "com.aivoicecopilot.authToken"
     private let tokenExpiryKey = "com.aivoicecopilot.tokenExpiry"
-    
+    private let configuration = Configuration.shared
+
     private init() {}
     
     // MARK: - Token Management
@@ -104,11 +105,7 @@ class AuthService {
     }
     
     func login(email: String, password: String) async throws -> String {
-        // TODO: Replace with actual authentication endpoint
-        // POST /v1/auth/login
-        // Returns: { "token": "...", "expires_at": "..." }
-        
-        guard let url = URL(string: "https://api.example.com/v1/auth/login") else {
+        guard let url = URL(string: configuration.authLoginURL) else {
             throw AuthError.invalidURL
         }
         
@@ -147,9 +144,35 @@ class AuthService {
     }
     
     func refreshToken() async throws {
-        // TODO: Implement token refresh logic
-        // POST /v1/auth/refresh
-        throw AuthError.notImplemented
+        guard let url = URL(string: configuration.authRefreshURL) else {
+            throw AuthError.invalidURL
+        }
+
+        guard let currentToken = authToken else {
+            throw AuthError.tokenExpired
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(currentToken)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200...299).contains(httpResponse.statusCode) else {
+            throw AuthError.authenticationFailed
+        }
+
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        decoder.dateDecodingStrategy = .iso8601
+        let authResponse = try decoder.decode(AuthResponse.self, from: data)
+
+        authToken = authResponse.token
+        if let expiry = authResponse.expiresAt {
+            UserDefaults.standard.set(expiry, forKey: tokenExpiryKey)
+        }
     }
 }
 

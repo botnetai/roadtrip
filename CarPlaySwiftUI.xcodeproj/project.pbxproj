@@ -7,10 +7,31 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0EFA00C96BE75477477D0764 /* CallManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B47152B25017465B10BC0D70 /* CallManager.swift */; };
+		02959624A5982587B96798E2 /* CallKitProtocols.swift in Sources */ = {isa = PBXBuildFile; fileRef = A14066993B218B00EAB9281D /* CallKitProtocols.swift */; };
+		E5FF4269A0FC19DD60EBAE80 /* LiveKitService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9675F68966B06ED84429C11C /* LiveKitService.swift */; };
+		37A2552CD8F5FECEAF8CFE8C /* SessionLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 750AD0E191A00BF314925834 /* SessionLogger.swift */; };
+		6C58F99A69ECED8053CC2CBF /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9AEA20E2FF6F23D5382061B /* AuthService.swift */; };
+		C6B1538D152779247A875680 /* Configuration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 955C4F1C4DA930C652EC715E /* Configuration.swift */; };
+		960754B4CF9635E3890DF8F5 /* Session.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F4B35EC9C1C4B6E70B04D67 /* Session.swift */; };
+		971D1764C310045005E2A072 /* UserSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE42B9415312B56F7EA4DB3F /* UserSettings.swift */; };
+		F3A0905138AE4C6D8DEA3AEE /* HomeScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C19B09085B304D9CC60C038 /* HomeScreen.swift */; };
+		D8F42AA5313BE73F164402E2 /* OnboardingScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = C97D27792DB98A6415A139B2 /* OnboardingScreen.swift */; };
+		F74BBF634EE88CF77F326089 /* SessionsListScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41AE9456A9C81A52015484E0 /* SessionsListScreen.swift */; };
+		845B4F43C53ADB1782DD323B /* SessionDetailScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FB9C43A548091AD05A0CE38 /* SessionDetailScreen.swift */; };
+		610FF6E03DEB7DEBB6E8FB0B /* SettingsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A79AD2CD15C369F5E45DDE03 /* SettingsScreen.swift */; };
+		153F926AE75A9DEE3666FB43 /* AppCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0A7C61059E1FBED46737C3B /* AppCoordinator.swift */; };
+		8ACAA9DD5F346B0A84B2425C /* AssistantCallCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C6E520133E6480097751AFA /* AssistantCallCoordinator.swift */; };
 		95C58B642B75208B00FB7199 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95C58B632B75208B00FB7199 /* ContentView.swift */; };
 		95C58B662B75208F00FB7199 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 95C58B652B75208F00FB7199 /* Assets.xcassets */; };
 		95C58B692B75208F00FB7199 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 95C58B682B75208F00FB7199 /* Preview Assets.xcassets */; };
 		95C58B732B75208F00FB7199 /* CarPlaySwiftUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95C58B722B75208F00FB7199 /* CarPlaySwiftUITests.swift */; };
+		E8A9C5D4F7B2E6A3D8C1F4E5 /* MockCallKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3D8E9F7C5B4A2E8D9F1C6E7 /* MockCallKit.swift */; };
+		F9B8E7C6D5A4F3E8C9D2E5F6 /* MockURLProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4E9F8D7C6A5E3F9D8C1F7E8 /* MockURLProtocol.swift */; };
+		D7C6E8F9A5B4D3E7C8F1E6D9 /* CallManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5F8E9D7A6B4F3E8D9C2E7F1 /* CallManagerTests.swift */; };
+		E8D9F7C6A5E4D8F9C7E1F6E2 /* AssistantCallCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6E9F8C7B5A4E3D9F8C2E7F3 /* AssistantCallCoordinatorTests.swift */; };
+		F9E8D7C6B5F4E9D8C7F2E6D3 /* SessionLoggerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7F9D8C6A5B4F3E9D8C1F7E4 /* SessionLoggerTests.swift */; };
+		D8E9F7C6A4E5D9F8C7E3F6E5 /* AuthServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8D9E7C6B5A4F3E8D9F2E7C5 /* AuthServiceTests.swift */; };
 		95C58B7D2B75208F00FB7199 /* CarPlaySwiftUIUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95C58B7C2B75208F00FB7199 /* CarPlaySwiftUIUITests.swift */; };
 		95C58B7F2B75208F00FB7199 /* CarPlaySwiftUIUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95C58B7E2B75208F00FB7199 /* CarPlaySwiftUIUITestsLaunchTests.swift */; };
 		95C58B8C2B75212C00FB7199 /* CarPlaySceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95C58B8B2B75212C00FB7199 /* CarPlaySceneDelegate.swift */; };
@@ -37,12 +58,33 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		B47152B25017465B10BC0D70 /* CallManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallManager.swift; sourceTree = "<group>"; };
+		A14066993B218B00EAB9281D /* CallKitProtocols.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallKitProtocols.swift; sourceTree = "<group>"; };
+		9675F68966B06ED84429C11C /* LiveKitService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveKitService.swift; sourceTree = "<group>"; };
+		750AD0E191A00BF314925834 /* SessionLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionLogger.swift; sourceTree = "<group>"; };
+		A9AEA20E2FF6F23D5382061B /* AuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
+		955C4F1C4DA930C652EC715E /* Configuration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Configuration.swift; sourceTree = "<group>"; };
+		5F4B35EC9C1C4B6E70B04D67 /* Session.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Session.swift; sourceTree = "<group>"; };
+		EE42B9415312B56F7EA4DB3F /* UserSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserSettings.swift; sourceTree = "<group>"; };
+		5C19B09085B304D9CC60C038 /* HomeScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeScreen.swift; sourceTree = "<group>"; };
+		C97D27792DB98A6415A139B2 /* OnboardingScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingScreen.swift; sourceTree = "<group>"; };
+		41AE9456A9C81A52015484E0 /* SessionsListScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionsListScreen.swift; sourceTree = "<group>"; };
+		6FB9C43A548091AD05A0CE38 /* SessionDetailScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionDetailScreen.swift; sourceTree = "<group>"; };
+		A79AD2CD15C369F5E45DDE03 /* SettingsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsScreen.swift; sourceTree = "<group>"; };
+		C0A7C61059E1FBED46737C3B /* AppCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppCoordinator.swift; sourceTree = "<group>"; };
+		1C6E520133E6480097751AFA /* AssistantCallCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssistantCallCoordinator.swift; sourceTree = "<group>"; };
 		95C58B5E2B75208B00FB7199 /* CarPlaySwiftUI.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CarPlaySwiftUI.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		95C58B632B75208B00FB7199 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		95C58B652B75208F00FB7199 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		95C58B682B75208F00FB7199 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		95C58B6E2B75208F00FB7199 /* CarPlaySwiftUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CarPlaySwiftUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		95C58B722B75208F00FB7199 /* CarPlaySwiftUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlaySwiftUITests.swift; sourceTree = "<group>"; };
+		A3D8E9F7C5B4A2E8D9F1C6E7 /* MockCallKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockCallKit.swift; sourceTree = "<group>"; };
+		B4E9F8D7C6A5E3F9D8C1F7E8 /* MockURLProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockURLProtocol.swift; sourceTree = "<group>"; };
+		C5F8E9D7A6B4F3E8D9C2E7F1 /* CallManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallManagerTests.swift; sourceTree = "<group>"; };
+		D6E9F8C7B5A4E3D9F8C2E7F3 /* AssistantCallCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssistantCallCoordinatorTests.swift; sourceTree = "<group>"; };
+		E7F9D8C6A5B4F3E9D8C1F7E4 /* SessionLoggerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionLoggerTests.swift; sourceTree = "<group>"; };
+		F8D9E7C6B5A4F3E8D9F2E7C5 /* AuthServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthServiceTests.swift; sourceTree = "<group>"; };
 		95C58B782B75208F00FB7199 /* CarPlaySwiftUIUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CarPlaySwiftUIUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		95C58B7C2B75208F00FB7199 /* CarPlaySwiftUIUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlaySwiftUIUITests.swift; sourceTree = "<group>"; };
 		95C58B7E2B75208F00FB7199 /* CarPlaySwiftUIUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlaySwiftUIUITestsLaunchTests.swift; sourceTree = "<group>"; };
@@ -80,6 +122,49 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		564EAF51B7DD4639ADD9B985 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				B47152B25017465B10BC0D70 /* CallManager.swift */,
+				A14066993B218B00EAB9281D /* CallKitProtocols.swift */,
+				9675F68966B06ED84429C11C /* LiveKitService.swift */,
+				750AD0E191A00BF314925834 /* SessionLogger.swift */,
+				A9AEA20E2FF6F23D5382061B /* AuthService.swift */,
+				955C4F1C4DA930C652EC715E /* Configuration.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		9CF43B31E8845D861542A38E /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				5F4B35EC9C1C4B6E70B04D67 /* Session.swift */,
+				EE42B9415312B56F7EA4DB3F /* UserSettings.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		8429FDD5624F6DF9D0F3F475 /* Screens */ = {
+			isa = PBXGroup;
+			children = (
+				5C19B09085B304D9CC60C038 /* HomeScreen.swift */,
+				C97D27792DB98A6415A139B2 /* OnboardingScreen.swift */,
+				41AE9456A9C81A52015484E0 /* SessionsListScreen.swift */,
+				6FB9C43A548091AD05A0CE38 /* SessionDetailScreen.swift */,
+				A79AD2CD15C369F5E45DDE03 /* SettingsScreen.swift */,
+			);
+			path = Screens;
+			sourceTree = "<group>";
+		};
+		30F3F8C2C66A0F53C7A9EF9F /* Coordinators */ = {
+			isa = PBXGroup;
+			children = (
+				C0A7C61059E1FBED46737C3B /* AppCoordinator.swift */,
+				1C6E520133E6480097751AFA /* AssistantCallCoordinator.swift */,
+			);
+			path = Coordinators;
+			sourceTree = "<group>";
+		};
 		95C58B552B75208B00FB7199 = {
 			isa = PBXGroup;
 			children = (
@@ -108,6 +193,10 @@
 				95C58B902B75219900FB7199 /* SceneDelegate.swift */,
 				95C58B8B2B75212C00FB7199 /* CarPlaySceneDelegate.swift */,
 				95C58B632B75208B00FB7199 /* ContentView.swift */,
+				564EAF51B7DD4639ADD9B985 /* Services */,
+				9CF43B31E8845D861542A38E /* Models */,
+				8429FDD5624F6DF9D0F3F475 /* Screens */,
+				30F3F8C2C66A0F53C7A9EF9F /* Coordinators */,
 				95C58B8F2B75216A00FB7199 /* Info.plist */,
 				95C58B652B75208F00FB7199 /* Assets.xcassets */,
 				95C58B952B75234300FB7199 /* CarPlaySwiftUI.entitlements */,
@@ -127,8 +216,22 @@
 			isa = PBXGroup;
 			children = (
 				95C58B722B75208F00FB7199 /* CarPlaySwiftUITests.swift */,
+				C5F8E9D7A6B4F3E8D9C2E7F1 /* CallManagerTests.swift */,
+				D6E9F8C7B5A4E3D9F8C2E7F3 /* AssistantCallCoordinatorTests.swift */,
+				E7F9D8C6A5B4F3E9D8C1F7E4 /* SessionLoggerTests.swift */,
+				F8D9E7C6B5A4F3E8D9F2E7C5 /* AuthServiceTests.swift */,
+				A9E8D7F6C5B4E3D8F9C1E7A2 /* Mocks */,
 			);
 			path = CarPlaySwiftUITests;
+			sourceTree = "<group>";
+		};
+		A9E8D7F6C5B4E3D8F9C1E7A2 /* Mocks */ = {
+			isa = PBXGroup;
+			children = (
+				A3D8E9F7C5B4A2E8D9F1C6E7 /* MockCallKit.swift */,
+				B4E9F8D7C6A5E3F9D8C1F7E8 /* MockURLProtocol.swift */,
+			);
+			path = Mocks;
 			sourceTree = "<group>";
 		};
 		95C58B7B2B75208F00FB7199 /* CarPlaySwiftUIUITests */ = {
@@ -164,6 +267,9 @@
 			dependencies = (
 			);
 			name = CarPlaySwiftUI;
+			packageProductDependencies = (
+				A7E8F3C4D6B9E1F2A8C5D7E9 /* LiveKit */,
+			);
 			productName = CarPlaySwiftUI;
 			productReference = 95C58B5E2B75208B00FB7199 /* CarPlaySwiftUI.app */;
 			productType = "com.apple.product-type.application";
@@ -236,6 +342,9 @@
 				Base,
 			);
 			mainGroup = 95C58B552B75208B00FB7199;
+			packageReferences = (
+				F2D9E7A5B8C6D1E3F4A7B9C8 /* XCRemoteSwiftPackageReference "client-swift" */,
+			);
 			productRefGroup = 95C58B5F2B75208B00FB7199 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -282,6 +391,21 @@
 				95C58B8E2B75214A00FB7199 /* AppDelegate.swift in Sources */,
 				95C58B642B75208B00FB7199 /* ContentView.swift in Sources */,
 				95C58B8C2B75212C00FB7199 /* CarPlaySceneDelegate.swift in Sources */,
+				0EFA00C96BE75477477D0764 /* CallManager.swift in Sources */,
+				02959624A5982587B96798E2 /* CallKitProtocols.swift in Sources */,
+				E5FF4269A0FC19DD60EBAE80 /* LiveKitService.swift in Sources */,
+				37A2552CD8F5FECEAF8CFE8C /* SessionLogger.swift in Sources */,
+				6C58F99A69ECED8053CC2CBF /* AuthService.swift in Sources */,
+				C6B1538D152779247A875680 /* Configuration.swift in Sources */,
+				960754B4CF9635E3890DF8F5 /* Session.swift in Sources */,
+				971D1764C310045005E2A072 /* UserSettings.swift in Sources */,
+				F3A0905138AE4C6D8DEA3AEE /* HomeScreen.swift in Sources */,
+				D8F42AA5313BE73F164402E2 /* OnboardingScreen.swift in Sources */,
+				F74BBF634EE88CF77F326089 /* SessionsListScreen.swift in Sources */,
+				845B4F43C53ADB1782DD323B /* SessionDetailScreen.swift in Sources */,
+				610FF6E03DEB7DEBB6E8FB0B /* SettingsScreen.swift in Sources */,
+				153F926AE75A9DEE3666FB43 /* AppCoordinator.swift in Sources */,
+				8ACAA9DD5F346B0A84B2425C /* AssistantCallCoordinator.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -290,6 +414,12 @@
 			buildActionMask = 2147483647;
 			files = (
 				95C58B732B75208F00FB7199 /* CarPlaySwiftUITests.swift in Sources */,
+				E8A9C5D4F7B2E6A3D8C1F4E5 /* MockCallKit.swift in Sources */,
+				F9B8E7C6D5A4F3E8C9D2E5F6 /* MockURLProtocol.swift in Sources */,
+				D7C6E8F9A5B4D3E7C8F1E6D9 /* CallManagerTests.swift in Sources */,
+				E8D9F7C6A5E4D8F9C7E1F6E2 /* AssistantCallCoordinatorTests.swift in Sources */,
+				F9E8D7C6B5F4E9D8C7F2E6D3 /* SessionLoggerTests.swift in Sources */,
+				D8E9F7C6A4E5D9F8C7E3F6E5 /* AuthServiceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -623,6 +753,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		F2D9E7A5B8C6D1E3F4A7B9C8 /* XCRemoteSwiftPackageReference "client-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/livekit/client-swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A7E8F3C4D6B9E1F2A8C5D7E9 /* LiveKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F2D9E7A5B8C6D1E3F4A7B9C8 /* XCRemoteSwiftPackageReference "client-swift" */;
+			productName = LiveKit;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 95C58B562B75208B00FB7199 /* Project object */;
 }

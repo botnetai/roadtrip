@@ -5,14 +5,12 @@
 
 import Foundation
 
-// TODO: Replace with actual backend URL
-private let baseURL = "https://api.example.com/v1"
-
 class SessionLogger {
     static let shared = SessionLogger()
-    
+
     private let settings = UserSettings.shared
     private let authService = AuthService.shared
+    private let configuration = Configuration.shared
     private let urlSession: URLSession
     
     // Dependency injection for testing
@@ -72,7 +70,7 @@ class SessionLogger {
     }
     
     func startSession(context: Session.SessionContext) async throws -> StartSessionResponse {
-        guard let url = URL(string: "\(baseURL)/sessions/start") else {
+        guard let url = URL(string: "\(configuration.apiBaseURL)/sessions/start") else {
             throw SessionLoggerError.invalidURL
         }
         
@@ -91,7 +89,7 @@ class SessionLogger {
     }
     
     func endSession(sessionID: String) async throws {
-        guard let url = URL(string: "\(baseURL)/sessions/end") else {
+        guard let url = URL(string: "\(configuration.apiBaseURL)/sessions/end") else {
             throw SessionLoggerError.invalidURL
         }
         
@@ -116,7 +114,7 @@ class SessionLogger {
         // Fire-and-forget - don't block the call flow
         Task {
             do {
-                guard let url = URL(string: "\(baseURL)/sessions/\(sessionID)/turn") else { return }
+                guard let url = URL(string: "\(configuration.apiBaseURL)/sessions/\(sessionID)/turn") else { return }
                 
                 var request = createAuthenticatedRequest(url: url, method: "POST")
                 
@@ -138,7 +136,7 @@ class SessionLogger {
     }
     
     func fetchSessions() async throws -> [SessionListItem] {
-        guard let url = URL(string: "\(baseURL)/sessions") else {
+        guard let url = URL(string: "\(configuration.apiBaseURL)/sessions") else {
             throw SessionLoggerError.invalidURL
         }
         
@@ -151,7 +149,7 @@ class SessionLogger {
     }
     
     func fetchSessionDetail(sessionID: String) async throws -> (SessionSummary?, [Turn]) {
-        guard let url = URL(string: "\(baseURL)/sessions/\(sessionID)") else {
+        guard let url = URL(string: "\(configuration.apiBaseURL)/sessions/\(sessionID)") else {
             throw SessionLoggerError.invalidURL
         }
         
@@ -172,7 +170,7 @@ class SessionLogger {
     }
     
     func deleteSession(sessionID: String) async throws {
-        guard let url = URL(string: "\(baseURL)/sessions/\(sessionID)") else {
+        guard let url = URL(string: "\(configuration.apiBaseURL)/sessions/\(sessionID)") else {
             throw SessionLoggerError.invalidURL
         }
         
@@ -185,7 +183,7 @@ class SessionLogger {
     }
     
     func deleteAllSessions() async throws {
-        guard let url = URL(string: "\(baseURL)/sessions") else {
+        guard let url = URL(string: "\(configuration.apiBaseURL)/sessions") else {
             throw SessionLoggerError.invalidURL
         }
         
