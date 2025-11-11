@@ -226,9 +226,10 @@ async def entrypoint(ctx: agents.JobContext):
         raise
 
 if __name__ == "__main__":
-    # Start the agent worker
+    # Start the agent worker with explicit dispatch support
     agents.cli.run_app(
         agents.WorkerOptions(
             entrypoint_fnc=entrypoint,
+            agent_name="agent",  # Required for explicit dispatch
         ),
     )
