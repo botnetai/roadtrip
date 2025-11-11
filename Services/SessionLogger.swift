@@ -251,6 +251,52 @@ class SessionLogger {
         }
     }
     
+    func fetchSessionDetailWithRetry(sessionID: String, maxAttempts: Int = 4) async throws -> SessionDetailData {
+        var attempt = 0
+        var lastError: Error?
+        
+        while attempt < maxAttempts {
+            attempt += 1
+            do {
+                let detail = try await fetchSessionDetail(sessionID: sessionID)
+                
+                if shouldRetry(detail: detail, currentAttempt: attempt, maxAttempts: maxAttempts) {
+                    let delay = retryDelay(for: attempt)
+                    try await Task.sleep(nanoseconds: delay)
+                    continue
+                }
+                
+                return detail
+            } catch {
+                lastError = error
+                if attempt >= maxAttempts {
+                    throw error
+                }
+                
+                let delay = retryDelay(for: attempt)
+                try await Task.sleep(nanoseconds: delay)
+            }
+        }
+        
+        throw lastError ?? SessionLoggerError.invalidResponse
+    }
+    
+    private func shouldRetry(detail: SessionDetailData, currentAttempt: Int, maxAttempts: Int) -> Bool {
+        guard currentAttempt < maxAttempts else { return false }
+        // If we already have either a summary or transcript turns, we can stop retrying
+        if detail.summary != nil { return false }
+        if !detail.turns.isEmpty { return false }
+        // Retry a couple times while summary is still pending
+        return detail.session.summaryStatus == .pending
+    }
+    
+    private func retryDelay(for attempt: Int) -> UInt64 {
+        // Exponential backoff starting at 0.5s: 0.5, 1.0, 2.0, 4.0
+        let baseDelay: Double = 0.5
+        let seconds = baseDelay * pow(2.0, Double(attempt - 1))
+        return UInt64(seconds * 1_000_000_000)
+    }
+    
     private func fetchSessionSummary(sessionID: String) async throws -> SessionSummary? {
         guard let url = URL(string: "\(configuration.apiBaseURL)/sessions/\(sessionID)/summary") else {
             throw SessionLoggerError.invalidURL
@@ -369,13 +415,13 @@ struct SessionDetailData {
 }
 
 private struct SessionDTO: Codable {
-    let id: String
+    let id: String?
     let userId: String?
-    let context: Session.SessionContext
-    let startedAt: Date
-    let endedAt: Date?
-    let loggingEnabledSnapshot: Bool
-    let summaryStatus: Session.SummaryStatus?
+    let context: String?
+    let startedAt: String?
+    let endedAt: String?
+    let loggingEnabledSnapshot: Bool?
+    let summaryStatus: String?
     
     enum CodingKeys: String, CodingKey {
         case id
@@ -389,13 +435,26 @@ private struct SessionDTO: Codable {
     
     func toModel() -> Session {
         Session(
-            id: id,
+            id: id ?? "session-\(UUID().uuidString)",
             userId: userId ?? "unknown",
-            context: context,
-            startedAt: startedAt,
-            endedAt: endedAt,
-            loggingEnabledSnapshot: loggingEnabledSnapshot,
-            summaryStatus: summaryStatus ?? .pending
+            context: Session.SessionContext(rawValue: context ?? "phone") ?? .phone,
+            startedAt: parseDate(from: startedAt) ?? Date(),
+            endedAt: parseDate(from: endedAt),
+            loggingEnabledSnapshot: loggingEnabledSnapshot ?? false,
+            summaryStatus: Session.SummaryStatus(rawValue: summaryStatus ?? "pending") ?? .pending
         )
+    }
+    
+    private func parseDate(from string: String?) -> Date? {
+        guard let string = string else { return nil }
+        let formatterWithFractional = ISO8601DateFormatter()
+        formatterWithFractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        
+        if let date = formatterWithFractional.date(from: string) {
+            return date
+        }
+        
+        let formatter = ISO8601DateFormatter()
+        return formatter.date(from: string)
     }
 }

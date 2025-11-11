@@ -92,10 +92,7 @@ struct SessionDetailScreen: View {
 
         Task {
             do {
-                // Add a small delay to allow backend to finish processing the session
-                try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
-
-                let detail = try await SessionLogger.shared.fetchSessionDetail(sessionID: sessionID)
+                let detail = try await SessionLogger.shared.fetchSessionDetailWithRetry(sessionID: sessionID)
                 await MainActor.run {
                     self.session = detail.session
                     self.summary = detail.summary
