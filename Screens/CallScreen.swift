@@ -114,7 +114,7 @@ struct CallScreen: View {
 
 struct LoggingOptionsView: View {
     @Binding var selectedOption: CallScreen.LoggingOption?
-    @Bindable var settings: UserSettings
+    @ObservedObject var settings: UserSettings
 
     var body: some View {
         VStack(spacing: 12) {
@@ -298,7 +298,7 @@ struct ErrorIndicatorView: View {
 }
 
 struct ModelPickerView: View {
-    @Bindable var settings: UserSettings
+    @ObservedObject var settings: UserSettings
 
     var body: some View {
         List {
@@ -334,7 +334,7 @@ struct ModelPickerView: View {
 }
 
 struct VoicePickerView: View {
-    @Bindable var settings: UserSettings
+    @ObservedObject var settings: UserSettings
 
     var body: some View {
         List {
