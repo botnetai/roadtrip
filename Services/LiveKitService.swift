@@ -80,23 +80,26 @@ final class LiveKitService: @unchecked Sendable {
     }
 }
 
-@MainActor
 extension LiveKitService: RoomDelegate {
-    func roomDidConnect(_ room: Room) {
-        // Connection established
-    }
-
-    func room(_ room: Room, didDisconnectWithError error: Error?) {
-        isConnected = false
-        self.room = nil
-        if let error = error {
-            delegate?.liveKitServiceDidFail(error: error)
-        } else {
-            delegate?.liveKitServiceDidDisconnect()
+    nonisolated func roomDidConnect(_ room: Room) {
+        Task { @MainActor in
+            // Connection established
         }
     }
 
-    func room(_ room: Room, participant: RemoteParticipant, didSubscribeTo publication: RemoteTrackPublication, track: Track) {
+    nonisolated func room(_ room: Room, didDisconnectWithError error: LiveKitError?) {
+        Task { @MainActor in
+            isConnected = false
+            self.room = nil
+            if let error = error {
+                delegate?.liveKitServiceDidFail(error: error)
+            } else {
+                delegate?.liveKitServiceDidDisconnect()
+            }
+        }
+    }
+
+    nonisolated func room(_ room: Room, participant: RemoteParticipant, didSubscribeTo publication: RemoteTrackPublication, track: Track) {
         if publication.kind == .audio {
             // Audio track subscribed successfully
         }

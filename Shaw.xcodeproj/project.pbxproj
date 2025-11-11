@@ -42,6 +42,8 @@
 		F74BBF634EE88CF77F326089 /* SessionsListScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41AE9456A9C81A52015484E0 /* SessionsListScreen.swift */; };
 		F9B8E7C6D5A4F3E8C9D2E5F6 /* MockURLProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4E9F8D7C6A5E3F9D8C1F7E8 /* MockURLProtocol.swift */; };
 		F9E8D7C6B5F4E9D8C7F2E6D3 /* SessionLoggerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7F9D8C6A5B4F3E9D8C1F7E4 /* SessionLoggerTests.swift */; };
+		96E063464E4D416BAE82EC13 /* HybridSessionLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A6D2EE242DA425281900EEA /* HybridSessionLogger.swift */; };
+		DF0819F8ED1C4FE18C56788D /* CloudKitSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29424058412245489CA329CA /* CloudKitSyncService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -63,6 +65,7 @@
 
 /* Begin PBXFileReference section */
 		1C6E520133E6480097751AFA /* AssistantCallCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssistantCallCoordinator.swift; sourceTree = "<group>"; };
+		29424058412245489CA329CA /* CloudKitSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudKitSyncService.swift; sourceTree = "<group>"; };
 		41AE9456A9C81A52015484E0 /* SessionsListScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionsListScreen.swift; sourceTree = "<group>"; };
 		5C19B09085B304D9CC60C038 /* HomeScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeScreen.swift; sourceTree = "<group>"; };
 		5F4B35EC9C1C4B6E70B04D67 /* Session.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Session.swift; sourceTree = "<group>"; };
@@ -86,6 +89,7 @@
 		95C58B932B7521F600FB7199 /* CarPlay.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CarPlay.framework; path = System/Library/Frameworks/CarPlay.framework; sourceTree = SDKROOT; };
 		95C58B952B75234300FB7199 /* Shaw.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Shaw.entitlements; sourceTree = "<group>"; };
 		9675F68966B06ED84429C11C /* LiveKitService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveKitService.swift; sourceTree = "<group>"; };
+		9A6D2EE242DA425281900EEA /* HybridSessionLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HybridSessionLogger.swift; sourceTree = "<group>"; };
 		9ACA884917C34E0C8DEDA8FD /* VoicePreviewService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoicePreviewService.swift; sourceTree = "<group>"; };
 		A14066993B218B00EAB9281D /* CallKitProtocols.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallKitProtocols.swift; sourceTree = "<group>"; };
 		A3D8E9F7C5B4A2E8D9F1C6E7 /* MockCallKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockCallKit.swift; sourceTree = "<group>"; };
@@ -147,6 +151,8 @@
 				A14066993B218B00EAB9281D /* CallKitProtocols.swift */,
 				9675F68966B06ED84429C11C /* LiveKitService.swift */,
 				750AD0E191A00BF314925834 /* SessionLogger.swift */,
+				9A6D2EE242DA425281900EEA /* HybridSessionLogger.swift */,
+				29424058412245489CA329CA /* CloudKitSyncService.swift */,
 				A9AEA20E2FF6F23D5382061B /* AuthService.swift */,
 				955C4F1C4DA930C652EC715E /* Configuration.swift */,
 				9ACA884917C34E0C8DEDA8FD /* VoicePreviewService.swift */,
@@ -409,6 +415,8 @@
 				02959624A5982587B96798E2 /* CallKitProtocols.swift in Sources */,
 				E5FF4269A0FC19DD60EBAE80 /* LiveKitService.swift in Sources */,
 				37A2552CD8F5FECEAF8CFE8C /* SessionLogger.swift in Sources */,
+				96E063464E4D416BAE82EC13 /* HybridSessionLogger.swift in Sources */,
+				DF0819F8ED1C4FE18C56788D /* CloudKitSyncService.swift in Sources */,
 				6C58F99A69ECED8053CC2CBF /* AuthService.swift in Sources */,
 				C6B1538D152779247A875680 /* Configuration.swift in Sources */,
 				960754B4CF9635E3890DF8F5 /* Session.swift in Sources */,

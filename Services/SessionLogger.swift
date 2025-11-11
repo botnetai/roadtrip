@@ -73,17 +73,28 @@ class SessionLogger {
         guard let url = URL(string: "\(configuration.apiBaseURL)/sessions/start") else {
             throw SessionLoggerError.invalidURL
         }
-        
+
         var request = createAuthenticatedRequest(url: url, method: "POST")
-        
+
+        let settings = UserSettings.shared
+
+        // Extract voice ID (remove provider prefix for backend)
+        let voiceId = settings.selectedVoice.id
+            .replacingOccurrences(of: "cartesia-", with: "")
+            .replacingOccurrences(of: "elevenlabs-", with: "")
+            .replacingOccurrences(of: "openai-", with: "")
+
         let body: [String: Any] = [
-            "context": context.rawValue
+            "context": context.rawValue,
+            "model": settings.selectedModel.rawValue,
+            "voice": voiceId,
+            "realtime": settings.useRealtimeMode
         ]
-        
+
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        
+
         let (data, response) = try await urlSession.data(for: request)
-        
+
         let decoder = createDecoder()
         return try handleResponse(data: data, response: response, decoder: decoder)
     }

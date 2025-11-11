@@ -40,6 +40,12 @@ class UserSettings: ObservableObject {
         }
     }
 
+    @Published var useRealtimeMode: Bool {
+        didSet {
+            UserDefaults.standard.set(useRealtimeMode, forKey: "useRealtimeMode")
+        }
+    }
+
     static let shared = UserSettings()
 
     // Retention options: 0 = Never delete, > 0 = number of days
@@ -64,12 +70,26 @@ class UserSettings: ObservableObject {
             self.selectedModel = .gpt41Mini
         }
 
-        // Load selected voice
+        // Load realtime mode preference FIRST (default to true for realtime)
+        let storedUseRealtimeMode: Bool
+        if UserDefaults.standard.object(forKey: "useRealtimeMode") != nil {
+            storedUseRealtimeMode = UserDefaults.standard.bool(forKey: "useRealtimeMode")
+        } else {
+            storedUseRealtimeMode = true // Default to realtime mode
+        }
+        self.useRealtimeMode = storedUseRealtimeMode
+
+        // Load selected voice (depends on useRealtimeMode)
         if let data = UserDefaults.standard.data(forKey: "selectedVoice"),
            let voice = try? JSONDecoder().decode(TTSVoice.self, from: data) {
             self.selectedVoice = voice
         } else {
-            self.selectedVoice = TTSVoice(id: "cartesia-katie", name: "Katie", description: "Friendly female voice", provider: .cartesia)
+            // Default to OpenAI Realtime voice when in realtime mode
+            if storedUseRealtimeMode {
+                self.selectedVoice = TTSVoice.openaiRealtimeVoices[0] // alloy
+            } else {
+                self.selectedVoice = TTSVoice(id: "cartesia-katie", name: "Katie", description: "Friendly female voice", provider: .cartesia)
+            }
         }
     }
 }

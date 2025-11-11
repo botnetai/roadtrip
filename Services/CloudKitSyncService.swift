@@ -89,64 +89,48 @@ class CloudKitSyncService: ObservableObject {
         let recordID = CKRecord.ID(recordName: session.id)
         let record = CKRecord(recordType: "Session", recordID: recordID)
 
-        record["startTime"] = session.startTime as CKRecordValue
-        record["endTime"] = session.endTime as CKRecordValue?
-        record["duration"] = session.duration as CKRecordValue
+        record["userId"] = session.userId as CKRecordValue
+        record["startedAt"] = session.startedAt as CKRecordValue
+        record["endedAt"] = session.endedAt as CKRecordValue?
         record["context"] = session.context.rawValue as CKRecordValue
-        record["title"] = session.title as CKRecordValue?
-        record["summary"] = session.summary as CKRecordValue?
-        record["model"] = session.model as CKRecordValue?
-        record["voice"] = session.voice as CKRecordValue?
-
-        // Store transcript as JSON
-        if let transcriptData = try? JSONEncoder().encode(session.transcript) {
-            record["transcript"] = String(data: transcriptData, encoding: .utf8) as CKRecordValue?
-        }
+        record["loggingEnabledSnapshot"] = session.loggingEnabledSnapshot as CKRecordValue
+        record["summaryStatus"] = session.summaryStatus.rawValue as CKRecordValue
 
         return record
     }
 
     private func recordToSession(_ record: CKRecord) throws -> Session {
-        guard let startTime = record["startTime"] as? Date,
-              let duration = record["duration"] as? Int,
+        guard let userId = record["userId"] as? String,
+              let startedAt = record["startedAt"] as? Date,
               let contextString = record["context"] as? String,
-              let context = Session.SessionContext(rawValue: contextString) else {
+              let context = Session.SessionContext(rawValue: contextString),
+              let loggingEnabledSnapshot = record["loggingEnabledSnapshot"] as? Bool,
+              let summaryStatusString = record["summaryStatus"] as? String,
+              let summaryStatus = Session.SummaryStatus(rawValue: summaryStatusString) else {
             throw CloudKitError.invalidRecord
         }
 
-        let endTime = record["endTime"] as? Date
-        let title = record["title"] as? String
-        let summary = record["summary"] as? String
-        let model = record["model"] as? String
-        let voice = record["voice"] as? String
-
-        // Decode transcript from JSON
-        var transcript: [Session.TranscriptEntry] = []
-        if let transcriptString = record["transcript"] as? String,
-           let transcriptData = transcriptString.data(using: .utf8) {
-            transcript = (try? JSONDecoder().decode([Session.TranscriptEntry].self, from: transcriptData)) ?? []
-        }
+        let endedAt = record["endedAt"] as? Date
 
         return Session(
             id: record.recordID.recordName,
-            startTime: startTime,
-            endTime: endTime,
-            duration: duration,
+            userId: userId,
             context: context,
-            title: title,
-            summary: summary,
-            transcript: transcript,
-            model: model,
-            voice: voice
+            startedAt: startedAt,
+            endedAt: endedAt,
+            loggingEnabledSnapshot: loggingEnabledSnapshot,
+            summaryStatus: summaryStatus
         )
     }
 
     // MARK: - Subscriptions for Real-time Sync
 
     private func subscribeToChanges() async {
+        let subscriptionID = "session-changes"
         let subscription = CKQuerySubscription(
             recordType: "Session",
             predicate: NSPredicate(value: true),
+            subscriptionID: subscriptionID,
             options: [.firesOnRecordCreation, .firesOnRecordUpdate, .firesOnRecordDeletion]
         )
 

@@ -23,16 +23,45 @@ struct CallScreen: View {
                 if callCoordinator.callState == .idle {
                     Form {
                         Section {
-                            NavigationLink(destination: ModelPickerView(settings: settings)) {
-                                HStack {
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("AI Model")
-                                            .font(.subheadline)
-                                            .foregroundColor(.secondary)
-                                        Text(settings.selectedModel.displayName)
-                                            .font(.body)
+                            Toggle(isOn: $settings.useRealtimeMode) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Realtime Mode")
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                    Text(settings.useRealtimeMode ? "OpenAI Realtime (low latency)" : "Turn-based (STT → LLM → TTS)")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            .onChange(of: settings.useRealtimeMode) { oldValue, newValue in
+                                // When switching to turn-based mode with an OpenAI Realtime voice selected,
+                                // auto-switch to default Cartesia voice
+                                if !newValue && settings.selectedVoice.provider == .openaiRealtime {
+                                    settings.selectedVoice = TTSVoice.default
+                                }
+                                // When switching to realtime mode with non-realtime voice selected,
+                                // auto-switch to default OpenAI Realtime voice
+                                else if newValue && settings.selectedVoice.provider != .openaiRealtime {
+                                    settings.selectedVoice = TTSVoice.openaiRealtimeVoices[0]
+                                }
+                            }
+                        } header: {
+                            Text("Mode")
+                        }
+
+                        Section {
+                            if !settings.useRealtimeMode {
+                                NavigationLink(destination: ModelPickerView(settings: settings)) {
+                                    HStack {
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text("AI Model")
+                                                .font(.subheadline)
+                                                .foregroundColor(.secondary)
+                                            Text(settings.selectedModel.displayName)
+                                                .font(.body)
+                                        }
+                                        Spacer()
                                     }
-                                    Spacer()
                                 }
                             }
 
@@ -48,6 +77,8 @@ struct CallScreen: View {
                                     Spacer()
                                 }
                             }
+                        } header: {
+                            Text(settings.useRealtimeMode ? "Voice (OpenAI Realtime)" : "Model & Voice")
                         }
 
                         Section {
@@ -347,12 +378,16 @@ struct VoicePickerView: View {
 
     var body: some View {
         List {
-            ForEach(TTSProvider.allCases, id: \.self) { provider in
+            ForEach(availableProviders, id: \.self) { provider in
                 let voices = TTSVoice.voices(for: provider)
                 Section(provider.displayName) {
                     ForEach(voices) { voice in
                         Button {
                             settings.selectedVoice = voice
+                            // Auto-enable realtime mode when selecting OpenAI Realtime voice
+                            if voice.provider == .openaiRealtime {
+                                settings.useRealtimeMode = true
+                            }
                         } label: {
                             VoicePickerRow(voice: voice, isSelected: settings.selectedVoice.id == voice.id)
                         }
@@ -363,6 +398,16 @@ struct VoicePickerView: View {
         }
         .navigationTitle("Voice")
         .navigationBarTitleDisplayMode(.large)
+    }
+
+    private var availableProviders: [TTSProvider] {
+        if settings.useRealtimeMode {
+            // Only show OpenAI Realtime voices in realtime mode
+            return [.openaiRealtime]
+        } else {
+            // Show Cartesia and ElevenLabs in turn-based mode
+            return [.cartesia, .elevenlabs]
+        }
     }
 }
 

@@ -14,6 +14,12 @@ struct SettingsScreen: View {
     @State private var usageStats: UsageStatsResponse?
     @State private var isLoadingUsage = false
     @State private var usageError: String?
+    @StateObject private var hybridLogger = HybridSessionLogger.shared
+    @State private var syncStatus: String?
+    @State private var isRefreshing = false
+    @State private var showRestoreSuccess = false
+    @State private var showRestoreError = false
+    @State private var restoreErrorMessage: String?
 
     var body: some View {
         Form {
@@ -163,6 +169,51 @@ struct SettingsScreen: View {
             }
 
             Section {
+                HStack {
+                    Image(systemName: syncStatus?.contains("Syncing via iCloud") == true ? "checkmark.icloud" : "icloud.slash")
+                        .foregroundColor(syncStatus?.contains("Syncing via iCloud") == true ? .green : .orange)
+                        .imageScale(.large)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("iCloud Sync")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+
+                        if let status = syncStatus {
+                            Text(status)
+                                .font(.body)
+                                .foregroundColor(status.contains("Syncing via iCloud") ? .primary : .secondary)
+                        } else {
+                            Text("Checking...")
+                                .font(.body)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+
+                    Spacer()
+                }
+                .padding(.vertical, 4)
+
+                Button(action: restoreFromiCloud) {
+                    HStack {
+                        if isRefreshing {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                            Text("Restoring...")
+                        } else {
+                            Image(systemName: "arrow.clockwise.icloud")
+                            Text("Restore from iCloud")
+                        }
+                    }
+                }
+                .disabled(isRefreshing || syncStatus?.contains("unavailable") == true)
+            } header: {
+                Text("iCloud Sync")
+            } footer: {
+                Text("Sessions automatically sync across all your devices signed into the same iCloud account. Use restore to manually fetch the latest data from iCloud.")
+            }
+
+            Section {
                 NavigationLink(destination: VoicePickerView(settings: settings)) {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
@@ -234,11 +285,23 @@ struct SettingsScreen: View {
         } message: {
             Text("All session history has been deleted.")
         }
+        .alert("Restore Complete", isPresented: $showRestoreSuccess) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Your sessions have been successfully restored from iCloud.")
+        }
+        .alert("Restore Failed", isPresented: $showRestoreError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(restoreErrorMessage ?? "Failed to restore sessions from iCloud. Please try again.")
+        }
         .task {
             loadUsageStats()
+            await checkSyncStatus()
         }
         .refreshable {
             loadUsageStats()
+            await checkSyncStatus()
         }
     }
 
@@ -279,6 +342,31 @@ struct SettingsScreen: View {
             } catch {
                 await MainActor.run {
                     print("Failed to delete all sessions: \(error)")
+                }
+            }
+        }
+    }
+
+    private func checkSyncStatus() async {
+        let status = await hybridLogger.checkSyncStatus()
+        await MainActor.run {
+            syncStatus = status
+        }
+    }
+
+    private func restoreFromiCloud() {
+        isRefreshing = true
+        restoreErrorMessage = nil
+
+        Task {
+            await hybridLogger.loadSessions()
+            await MainActor.run {
+                isRefreshing = false
+                if hybridLogger.error != nil {
+                    restoreErrorMessage = hybridLogger.error?.localizedDescription
+                    showRestoreError = true
+                } else {
+                    showRestoreSuccess = true
                 }
             }
         }

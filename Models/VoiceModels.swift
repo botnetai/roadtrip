@@ -8,11 +8,13 @@ import Foundation
 enum TTSProvider: String, Codable, CaseIterable {
     case cartesia
     case elevenlabs
-    
+    case openaiRealtime
+
     var displayName: String {
         switch self {
         case .cartesia: return "Cartesia"
         case .elevenlabs: return "ElevenLabs"
+        case .openaiRealtime: return "OpenAI Realtime"
         }
     }
 }
@@ -38,11 +40,21 @@ struct TTSVoice: Identifiable, Codable, Equatable {
         TTSVoice(id: "elevenlabs-laura", name: "Laura", description: "Professional female voice", provider: .elevenlabs),
         TTSVoice(id: "elevenlabs-charlie", name: "Charlie", description: "Energetic male voice", provider: .elevenlabs)
     ]
-    
+
+    static let openaiRealtimeVoices: [TTSVoice] = [
+        TTSVoice(id: "openai-alloy", name: "Alloy", description: "Neutral, balanced voice", provider: .openaiRealtime),
+        TTSVoice(id: "openai-echo", name: "Echo", description: "Warm, friendly voice", provider: .openaiRealtime),
+        TTSVoice(id: "openai-fable", name: "Fable", description: "Expressive, storytelling voice", provider: .openaiRealtime),
+        TTSVoice(id: "openai-onyx", name: "Onyx", description: "Deep, authoritative voice", provider: .openaiRealtime),
+        TTSVoice(id: "openai-nova", name: "Nova", description: "Clear, energetic voice", provider: .openaiRealtime),
+        TTSVoice(id: "openai-shimmer", name: "Shimmer", description: "Soft, soothing voice", provider: .openaiRealtime)
+    ]
+
     static func voices(for provider: TTSProvider) -> [TTSVoice] {
         switch provider {
         case .cartesia: return cartesiaVoices
         case .elevenlabs: return elevenlabsVoices
+        case .openaiRealtime: return openaiRealtimeVoices
         }
     }
     

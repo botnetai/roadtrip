@@ -15,7 +15,7 @@ class HybridSessionLogger: ObservableObject {
     private let backend = SessionLogger.shared
     private let settings = UserSettings.shared
 
-    @Published var sessions: [Session] = []
+    @Published var sessions: [SessionListItem] = []
     @Published var isLoading = false
     @Published var error: Error?
 
@@ -35,15 +35,12 @@ class HybridSessionLogger: ObservableObject {
         if await cloudKit.isICloudAvailable() {
             let session = Session(
                 id: response.sessionId,
-                startTime: Date(),
-                endTime: nil,
-                duration: 0,
+                userId: "", // Will be set from backend response or iCloud user ID
                 context: context,
-                title: nil,
-                summary: nil,
-                transcript: [],
-                model: settings.selectedModel.rawValue,
-                voice: settings.selectedVoice.id
+                startedAt: Date(),
+                endedAt: nil,
+                loggingEnabledSnapshot: settings.loggingEnabled,
+                summaryStatus: .pending
             )
 
             try? await cloudKit.saveSession(session)
@@ -60,8 +57,7 @@ class HybridSessionLogger: ObservableObject {
         if await cloudKit.isICloudAvailable(),
            let session = try? await cloudKit.fetchSession(id: sessionID) {
             var updatedSession = session
-            updatedSession.endTime = Date()
-            updatedSession.duration = Int(Date().timeIntervalSince(session.startTime))
+            updatedSession.endedAt = Date()
 
             try? await cloudKit.saveSession(updatedSession)
         }
@@ -76,22 +72,8 @@ class HybridSessionLogger: ObservableObject {
         // Log to backend (fire and forget)
         backend.logTurn(sessionID: sessionID, speaker: speaker, text: text, timestamp: timestamp)
 
-        // Update CloudKit in background
-        Task {
-            guard await cloudKit.isICloudAvailable(),
-                  var session = try? await cloudKit.fetchSession(id: sessionID) else {
-                return
-            }
-
-            let entry = Session.TranscriptEntry(
-                speaker: speaker,
-                text: text,
-                timestamp: timestamp
-            )
-            session.transcript.append(entry)
-
-            try? await cloudKit.saveSession(session)
-        }
+        // Note: Transcripts are stored in backend only, not in CloudKit
+        // CloudKit only stores session metadata for sync
     }
 
     // MARK: - Fetching Sessions
@@ -103,7 +85,17 @@ class HybridSessionLogger: ObservableObject {
         do {
             // Try CloudKit first (instant, offline-capable)
             if await cloudKit.isICloudAvailable() {
-                sessions = try await cloudKit.fetchSessions()
+                let cloudKitSessions = try await cloudKit.fetchSessions()
+                // Convert Session to SessionListItem
+                sessions = cloudKitSessions.map { session in
+                    SessionListItem(
+                        id: session.id,
+                        title: "Session", // Title will come from summary
+                        summarySnippet: session.context.rawValue.capitalized,
+                        startedAt: session.startedAt,
+                        endedAt: session.endedAt
+                    )
+                }
             } else {
                 // Fallback to backend
                 sessions = try await backend.fetchSessions()
@@ -128,15 +120,16 @@ class HybridSessionLogger: ObservableObject {
             return session
         }
 
-        // Fallback to backend
-        return try await backend.fetchSession(id: id)
+        // Backend doesn't have a fetchSession method, only fetchSessionDetail
+        // Return nil for now since we can't convert SessionSummary + Turns to Session
+        return nil
     }
 
     // MARK: - Deletion
 
     func deleteSession(id: String) async throws {
         // Delete from both
-        try await backend.deleteSession(id: id)
+        try await backend.deleteSession(sessionID: id)
 
         if await cloudKit.isICloudAvailable() {
             try? await cloudKit.deleteSession(id: id)

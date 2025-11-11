@@ -19,31 +19,71 @@ class Assistant(Agent):
         )
 
 async def entrypoint(ctx: agents.JobContext):
-    """Entry point for the LiveKit agent - using OpenAI Realtime API"""
+    """Entry point for the LiveKit agent - supports both Realtime and Turn-based modes"""
     logger.info(f"🎙️  Agent joining room: {ctx.room.name}")
 
+    # Parse metadata from dispatch
+    import json
+    metadata = {}
     try:
-        # Use OpenAI Realtime model for direct speech-to-speech
-        # This bypasses separate STT/LLM/TTS pipeline for lower latency
-        realtime_model = openai.realtime.RealtimeModel(
-            voice="alloy",  # OpenAI Realtime voices: alloy, echo, fable, onyx, nova, shimmer
-            temperature=0.8,
-            modalities=["text", "audio"],
-        )
+        if ctx.job.metadata:
+            metadata = json.loads(ctx.job.metadata)
+            logger.info(f"📋 Received metadata: {metadata}")
+    except Exception as e:
+        logger.warning(f"Failed to parse metadata: {e}")
 
-        session = AgentSession(llm=realtime_model)
+    realtime_mode = metadata.get('realtime', True)  # Default to realtime for now
+    voice = metadata.get('voice', 'alloy')
+    model = metadata.get('model', 'openai/gpt-4.1-mini')
 
-        await session.start(
-            room=ctx.room,
-            agent=Assistant(),
-            room_input_options=RoomInputOptions(),
-        )
+    try:
+        if realtime_mode:
+            # OpenAI Realtime mode: direct speech-to-speech
+            logger.info(f"🔥 Using OpenAI Realtime mode with voice: {voice}")
+            realtime_model = openai.realtime.RealtimeModel(
+                voice=voice,  # OpenAI Realtime voices: alloy, echo, fable, onyx, nova, shimmer
+                temperature=0.8,
+                modalities=["text", "audio"],
+            )
 
-        await session.generate_reply(
-            instructions="Greet the user briefly and ask how you can help them."
-        )
+            session = AgentSession(llm=realtime_model)
 
-        logger.info("✅ Realtime agent session started successfully")
+            await session.start(
+                room=ctx.room,
+                agent=Assistant(),
+                room_input_options=RoomInputOptions(),
+            )
+
+            await session.generate_reply(
+                instructions="Greet the user briefly and ask how you can help them."
+            )
+
+            logger.info("✅ Realtime agent session started successfully")
+        else:
+            # Turn-based mode: STT → LLM → TTS pipeline
+            logger.info(f"🔄 Using turn-based mode with model: {model}, voice: {voice}")
+            # TODO: Implement turn-based mode with separate STT/LLM/TTS
+            # For now, fall back to realtime
+            logger.warning("⚠️  Turn-based mode not yet implemented, using realtime")
+            realtime_model = openai.realtime.RealtimeModel(
+                voice="alloy",
+                temperature=0.8,
+                modalities=["text", "audio"],
+            )
+
+            session = AgentSession(llm=realtime_model)
+
+            await session.start(
+                room=ctx.room,
+                agent=Assistant(),
+                room_input_options=RoomInputOptions(),
+            )
+
+            await session.generate_reply(
+                instructions="Greet the user briefly and ask how you can help them."
+            )
+
+            logger.info("✅ Agent session started (realtime fallback)")
 
     except Exception as e:
         logger.error(f"❌ Agent error: {e}")

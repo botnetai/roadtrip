@@ -83,7 +83,7 @@ export function getLiveKitUrl() {
   return url;
 }
 
-export async function dispatchAgentToRoom(roomName, model, tts) {
+export async function dispatchAgentToRoom(roomName, model, voice, realtime) {
   const apiKey = getLiveKitApiKey();
   const apiSecret = getLiveKitApiSecret();
   const url = getLiveKitUrl();
@@ -97,8 +97,9 @@ export async function dispatchAgentToRoom(roomName, model, tts) {
 
   // Agent metadata to pass to the LiveKit agent
   const agentMetadata = JSON.stringify({
+    realtime: realtime || false,
     model: model || 'openai/gpt-4.1-mini',
-    tts: tts || 'cartesia/sonic-3:9626c31c-bec5-4cca-baa8-f8ba9e84c8bc',
+    voice: voice || (realtime ? 'alloy' : 'cartesia/sonic-3:9626c31c-bec5-4cca-baa8-f8ba9e84c8bc'),
     instructions: 'You are a helpful voice AI assistant for CarPlay. Keep responses concise and clear for safe driving.'
   });
 

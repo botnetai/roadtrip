@@ -81,13 +81,15 @@ app.get('/health/agent', (req, res) => {
 // 1. POST /v1/sessions/start - Start new session
 app.post('/v1/sessions/start', authenticateToken, async (req, res) => {
   try {
-    const { context, model, tts } = req.body;
+    const { context, model, voice, realtime } = req.body;
 
     if (!context || !['phone', 'carplay'].includes(context)) {
       return res.status(400).json({ error: 'Invalid context' });
     }
 
-    // Validate model if provided (optional)
+    const useRealtimeMode = realtime === true;
+
+    // Validate model if provided (optional) - only for turn-based mode
     // Models use LiveKit Inference provider/model format
     // See: https://docs.livekit.io/agents/models/#inference
     const validModels = [
@@ -99,15 +101,20 @@ app.post('/v1/sessions/start', authenticateToken, async (req, res) => {
       'google/gemini-2.5-pro',
       'google/gemini-2.5-flash-lite'
     ];
-    
-    const selectedModel = model && validModels.includes(model) ? model : null;
 
-    // Validate TTS voice if provided (optional)
-    // TTS uses format: "provider/model:voice-id" (e.g., "cartesia/sonic-3:voice-id")
-    // See: https://docs.livekit.io/agents/models/tts/#inference
-    // Default to Cartesia Sonic-3 (LiveKit's default) if not specified
-    const defaultTTS = 'cartesia/sonic-3:9626c31c-bec5-4cca-baa8-f8ba9e84c8bc'; // Cartesia Coral (LiveKit quickstart default)
-    const selectedTTS = tts && typeof tts === 'string' && tts.includes(':') ? tts : defaultTTS;
+    const selectedModel = !useRealtimeMode && model && validModels.includes(model) ? model : null;
+
+    // Handle voice selection based on mode
+    let selectedVoice;
+    if (useRealtimeMode) {
+      // OpenAI Realtime voices: alloy, echo, fable, onyx, nova, shimmer
+      const realtimeVoices = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'];
+      selectedVoice = voice && realtimeVoices.includes(voice) ? voice : 'alloy';
+    } else {
+      // Turn-based mode: Cartesia or ElevenLabs
+      const defaultTTS = 'cartesia/sonic-3:9626c31c-bec5-4cca-baa8-f8ba9e84c8bc';
+      selectedVoice = voice && typeof voice === 'string' ? voice : defaultTTS;
+    }
 
     const sessionId = `session-${crypto.randomUUID()}`;
     const roomName = generateRoomName();
@@ -124,17 +131,17 @@ app.post('/v1/sessions/start', authenticateToken, async (req, res) => {
     `);
     stmt.run(sessionId, req.userId, context, new Date().toISOString(), selectedModel);
 
-    // Log model and voice selection for debugging
-    if (selectedModel) {
-      console.log(`Session ${sessionId} started with model: ${selectedModel}`);
+    // Log configuration for debugging
+    console.log(`Session ${sessionId} started in ${useRealtimeMode ? 'REALTIME' : 'TURN-BASED'} mode`);
+    if (useRealtimeMode) {
+      console.log(`  OpenAI Realtime voice: ${selectedVoice}`);
     } else {
-      console.log(`Session ${sessionId} started with default model (not specified)`);
+      console.log(`  Model: ${selectedModel || 'default'}`);
+      console.log(`  TTS voice: ${selectedVoice}`);
     }
-    
-    console.log(`Session ${sessionId} using TTS voice: ${selectedTTS}`);
 
     // Dispatch agent to room (don't wait for it, run in background)
-    dispatchAgentToRoom(roomName, selectedModel, selectedTTS).catch(error => {
+    dispatchAgentToRoom(roomName, selectedModel, selectedVoice, useRealtimeMode).catch(error => {
       console.error(`Failed to dispatch agent for session ${sessionId}:`, error.message);
     });
 
@@ -143,8 +150,9 @@ app.post('/v1/sessions/start', authenticateToken, async (req, res) => {
       livekit_url: livekitUrl,
       livekit_token: livekitToken,
       room_name: roomName,
-      model: selectedModel || 'default',
-      tts: selectedTTS
+      realtime: useRealtimeMode,
+      model: selectedModel || (useRealtimeMode ? 'openai-realtime' : 'default'),
+      voice: selectedVoice
     });
   } catch (error) {
     console.error('Start session error:', error);
