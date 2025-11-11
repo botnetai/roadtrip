@@ -381,8 +381,21 @@ struct VoicePickerRow: View {
 
             Spacer()
 
-            // Preview temporarily disabled
-            // Will be enabled once preview files are generated
+            if isLoadingPreview {
+                ProgressView()
+                    .scaleEffect(0.8)
+            } else {
+                Button(action: {
+                    Task {
+                        await togglePreview()
+                    }
+                }) {
+                    Image(systemName: isPlaying ? "stop.circle.fill" : "play.circle.fill")
+                        .foregroundColor(isPlaying ? .red : .blue)
+                        .font(.title3)
+                }
+                .buttonStyle(.plain)
+            }
 
             if isSelected {
                 Image(systemName: "checkmark")
