@@ -18,70 +18,76 @@ struct CallScreen: View {
     }
     
     var body: some View {
-        VStack(spacing: 0) {
-            if callCoordinator.callState == .idle {
-                Form {
-                    Section {
-                        NavigationLink(destination: ModelPickerView(settings: settings)) {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("AI Model")
-                                        .font(.subheadline)
-                                        .foregroundColor(.secondary)
-                                    Text(settings.selectedModel.displayName)
-                                        .font(.body)
+        ZStack(alignment: .bottom) {
+            VStack(spacing: 0) {
+                if callCoordinator.callState == .idle {
+                    Form {
+                        Section {
+                            NavigationLink(destination: ModelPickerView(settings: settings)) {
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("AI Model")
+                                            .font(.subheadline)
+                                            .foregroundColor(.secondary)
+                                        Text(settings.selectedModel.displayName)
+                                            .font(.body)
+                                    }
+                                    Spacer()
                                 }
-                                Spacer()
+                            }
+
+                            NavigationLink(destination: VoicePickerView(settings: settings)) {
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Voice")
+                                            .font(.subheadline)
+                                            .foregroundColor(.secondary)
+                                        Text(settings.selectedVoice.name)
+                                            .font(.body)
+                                    }
+                                    Spacer()
+                                }
                             }
                         }
 
-                        NavigationLink(destination: VoicePickerView(settings: settings)) {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Voice")
-                                        .font(.subheadline)
-                                        .foregroundColor(.secondary)
-                                    Text(settings.selectedVoice.name)
-                                        .font(.body)
-                                }
-                                Spacer()
-                            }
+                        Section {
+                            LoggingOptionsView(
+                                selectedOption: $selectedLoggingOption,
+                                settings: settings
+                            )
+                        } header: {
+                            Text("Recording")
                         }
                     }
+                } else if callCoordinator.callState == .connected {
+                    VStack(spacing: 16) {
+                        Spacer()
 
-                    Section {
-                        LoggingOptionsView(
-                            selectedOption: $selectedLoggingOption,
-                            settings: settings
+                        StatusIndicatorView(
+                            isLoggingEnabled: selectedLoggingOption == .enabled
                         )
-                    } header: {
-                        Text("Recording")
+                        .padding(.horizontal, 24)
+
+                        Spacer()
                     }
-                }
-            } else if callCoordinator.callState == .connected {
-                VStack(spacing: 16) {
-                    Spacer()
-
-                    StatusIndicatorView(
-                        isLoggingEnabled: selectedLoggingOption == .enabled
-                    )
-                    .padding(.horizontal, 24)
-
+                } else {
                     Spacer()
                 }
-            } else {
+
                 Spacer()
+                    .frame(height: 120)
             }
 
-            if let errorMessage = callCoordinator.errorMessage {
-                ErrorIndicatorView(message: errorMessage)
+            VStack(spacing: 8) {
+                if let errorMessage = callCoordinator.errorMessage {
+                    ErrorIndicatorView(message: errorMessage)
+                        .padding(.horizontal, 24)
+                }
+
+                callButton
                     .padding(.horizontal, 24)
-                    .padding(.bottom, 8)
+                    .padding(.bottom, 32)
             }
-
-            callButton
-                .padding(.horizontal, 24)
-                .padding(.bottom, 32)
         }
         .navigationTitle("Call")
         .navigationBarTitleDisplayMode(.large)
