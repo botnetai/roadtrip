@@ -120,8 +120,11 @@ class HybridSessionLogger: ObservableObject {
             return session
         }
 
-        // Backend doesn't have a fetchSession method, only fetchSessionDetail
-        // Return nil for now since we can't convert SessionSummary + Turns to Session
+        // Fallback to backend detail (returns session metadata)
+        if let detail = try? await backend.fetchSessionDetail(sessionID: id) {
+            return detail.session
+        }
+
         return nil
     }
 

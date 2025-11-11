@@ -48,11 +48,13 @@ const authenticateToken = (req, res, next) => {
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
+    console.warn('⚠️  No auth token provided');
     return res.status(401).json({ error: 'No token provided' });
   }
 
-  // In production, validate token properly
-  // For now, just check it exists
+  // Accept any token (device tokens start with "device_", JWT tokens are longer)
+  // In production, you would validate JWT tokens properly
+  console.log(`✅ Auth token accepted: ${token.substring(0, 20)}...`);
   req.userId = 'user-' + Buffer.from(token).toString('base64').slice(0, 10);
   next();
 };
@@ -303,7 +305,7 @@ app.get('/v1/sessions', authenticateToken, (req, res) => {
   }
 });
 
-// 5. GET /v1/sessions/{id} - Get session details
+// 5. GET /v1/sessions/{id} - Get session details (session + summary + turns)
 app.get('/v1/sessions/:id', authenticateToken, (req, res) => {
   try {
     const sessionId = req.params.id;
@@ -316,7 +318,34 @@ app.get('/v1/sessions/:id', authenticateToken, (req, res) => {
       return res.status(404).json({ error: 'Session not found' });
     }
 
-    res.json(session);
+    // Fetch summary if it exists
+    const summaryStmt = db.prepare('SELECT * FROM summaries WHERE session_id = ?');
+    const summary = summaryStmt.get(sessionId);
+
+    if (summary) {
+      try {
+        summary.action_items = JSON.parse(summary.action_items);
+      } catch {
+        summary.action_items = [];
+      }
+
+      try {
+        summary.tags = JSON.parse(summary.tags);
+      } catch {
+        summary.tags = [];
+      }
+    }
+
+    // Always return turns, even if empty
+    const turns = db.prepare(`
+      SELECT * FROM turns WHERE session_id = ? ORDER BY timestamp ASC
+    `).all(sessionId);
+
+    res.json({
+      session,
+      summary: summary || null,
+      turns
+    });
   } catch (error) {
     console.error('Get session error:', error);
     res.status(500).json({ error: error.message });

@@ -30,30 +30,40 @@ class SessionLogger {
     // MARK: - Request Helpers
     
     private func createAuthenticatedRequest(url: URL, method: String) -> URLRequest {
+        print("📡 createAuthenticatedRequest() - URL: \(url), Method: \(method)")
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
+
         // Add authentication token if available
         if let token = authService.authToken {
+            print("📡 Adding auth token to request: \(token.prefix(20))...")
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        } else {
+            print("❌ No auth token available for request!")
         }
-        
+
         return request
     }
     
     private func handleResponse<T: Decodable>(data: Data, response: URLResponse, decoder: JSONDecoder) throws -> T {
         guard let httpResponse = response as? HTTPURLResponse else {
+            print("❌ Invalid HTTP response")
             throw SessionLoggerError.invalidResponse
         }
-        
+
+        print("📡 Response status code: \(httpResponse.statusCode)")
+
         // Handle authentication errors
         if httpResponse.statusCode == 401 {
+            let errorMessage = String(data: data, encoding: .utf8) ?? "No error message"
+            print("❌ 401 Unauthorized - \(errorMessage)")
             throw SessionLoggerError.unauthorized
         }
-        
+
         guard (200...299).contains(httpResponse.statusCode) else {
             let errorMessage = String(data: data, encoding: .utf8) ?? "Server error"
+            print("❌ Server error (\(httpResponse.statusCode)): \(errorMessage)")
             throw SessionLoggerError.serverError(statusCode: httpResponse.statusCode, message: errorMessage)
         }
         
@@ -70,6 +80,34 @@ class SessionLogger {
     }
     
     func startSession(context: Session.SessionContext) async throws -> StartSessionResponse {
+        print("📡 startSession() called with context: \(context)")
+        // Try with current token
+        do {
+            return try await performStartSession(context: context)
+        } catch SessionLoggerError.unauthorized {
+            print("⚠️ Unauthorized error, attempting token refresh...")
+            // Token expired, try refreshing
+            do {
+                try await authService.refreshToken()
+                print("✅ Token refresh succeeded, retrying request...")
+                // Retry with new token
+                return try await performStartSession(context: context)
+            } catch {
+                print("❌ Token refresh failed: \(error)")
+                // Refresh failed, throw original unauthorized error
+                throw SessionLoggerError.unauthorized
+            }
+        }
+    }
+
+    private func performStartSession(context: Session.SessionContext) async throws -> StartSessionResponse {
+        // Ensure we have a valid auth token before making request
+        print("📡 Checking authentication before starting session...")
+        guard authService.isAuthenticated else {
+            print("❌ Not authenticated, cannot start session")
+            throw SessionLoggerError.unauthorized
+        }
+
         guard let url = URL(string: "\(configuration.apiBaseURL)/sessions/start") else {
             throw SessionLoggerError.invalidURL
         }
@@ -125,7 +163,7 @@ class SessionLogger {
         // Fire-and-forget - don't block the call flow
         Task {
             do {
-                guard let url = URL(string: "\(configuration.apiBaseURL)/sessions/\(sessionID)/turn") else { return }
+                guard let url = URL(string: "\(configuration.apiBaseURL)/sessions/\(sessionID)/turns") else { return }
                 
                 var request = createAuthenticatedRequest(url: url, method: "POST")
                 
@@ -159,7 +197,7 @@ class SessionLogger {
         return try handleResponse(data: data, response: response, decoder: decoder)
     }
     
-    func fetchSessionDetail(sessionID: String) async throws -> (SessionSummary?, [Turn]) {
+    func fetchSessionDetail(sessionID: String) async throws -> SessionDetailData {
         guard let url = URL(string: "\(configuration.apiBaseURL)/sessions/\(sessionID)") else {
             throw SessionLoggerError.invalidURL
         }
@@ -170,14 +208,75 @@ class SessionLogger {
         
         let decoder = createDecoder()
         
-        // Parse the actual response structure from backend
         struct SessionDetailResponse: Codable {
+            let session: Session
             let summary: SessionSummary?
             let turns: [Turn]
         }
         
-        let detailResponse: SessionDetailResponse = try handleResponse(data: data, response: response, decoder: decoder)
-        return (detailResponse.summary, detailResponse.turns)
+        do {
+            let detailResponse: SessionDetailResponse = try handleResponse(
+                data: data,
+                response: response,
+                decoder: decoder
+            )
+            
+            return SessionDetailData(
+                session: detailResponse.session,
+                summary: detailResponse.summary,
+                turns: detailResponse.turns
+            )
+        } catch let decodingError as DecodingError {
+            print("📡 Session detail decode failed for combined response, falling back to legacy endpoints: \(decodingError)")
+            
+            // Legacy backend returned the session object directly. Decode that first.
+            let legacySession = try decoder.decode(Session.self, from: data)
+            
+            async let turns = fetchSessionTurns(sessionID: sessionID)
+            async let summary = fetchSessionSummary(sessionID: sessionID)
+            
+            return SessionDetailData(
+                session: legacySession,
+                summary: try await summary,
+                turns: try await turns
+            )
+        }
+    }
+    
+    private func fetchSessionSummary(sessionID: String) async throws -> SessionSummary? {
+        guard let url = URL(string: "\(configuration.apiBaseURL)/sessions/\(sessionID)/summary") else {
+            throw SessionLoggerError.invalidURL
+        }
+        
+        let request = createAuthenticatedRequest(url: url, method: "GET")
+        let (data, response) = try await urlSession.data(for: request)
+        let decoder = createDecoder()
+        
+        do {
+            return try handleResponse(data: data, response: response, decoder: decoder)
+        } catch SessionLoggerError.serverError(let statusCode, _) where statusCode == 404 {
+            return nil
+        } catch SessionLoggerError.invalidResponse {
+            return nil
+        }
+    }
+    
+    private func fetchSessionTurns(sessionID: String) async throws -> [Turn] {
+        guard let url = URL(string: "\(configuration.apiBaseURL)/sessions/\(sessionID)/turns") else {
+            throw SessionLoggerError.invalidURL
+        }
+        
+        let request = createAuthenticatedRequest(url: url, method: "GET")
+        let (data, response) = try await urlSession.data(for: request)
+        let decoder = createDecoder()
+        
+        do {
+            return try handleResponse(data: data, response: response, decoder: decoder)
+        } catch SessionLoggerError.serverError(let statusCode, _) where statusCode == 404 {
+            return []
+        } catch SessionLoggerError.invalidResponse {
+            return []
+        }
     }
 
     func getUsageStats() async throws -> UsageStatsResponse {
@@ -253,4 +352,10 @@ struct UsageStatsResponse: Codable {
     let subscriptionTier: String
     let billingPeriodStart: Date
     let billingPeriodEnd: Date
+}
+
+struct SessionDetailData {
+    let session: Session
+    let summary: SessionSummary?
+    let turns: [Turn]
 }

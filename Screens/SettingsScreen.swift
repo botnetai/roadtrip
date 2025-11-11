@@ -146,29 +146,6 @@ struct SettingsScreen: View {
             }
 
             Section {
-                NavigationLink(destination: ModelPickerView(settings: settings)) {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("AI Model")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                            Text(settings.selectedModel.displayName)
-                                .font(.body)
-                        }
-                        Spacer()
-                    }
-                }
-
-                Text("The selected model will be used for all new assistant calls.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            } header: {
-                Text("AI Assistant")
-            } footer: {
-                Text("Different models offer varying balances of speed, quality, and cost. Changes take effect on your next call.")
-            }
-
-            Section {
                 HStack {
                     Image(systemName: syncStatus?.contains("Syncing via iCloud") == true ? "checkmark.icloud" : "icloud.slash")
                         .foregroundColor(syncStatus?.contains("Syncing via iCloud") == true ? .green : .orange)

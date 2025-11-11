@@ -19,65 +19,131 @@ class AuthService {
     
     var authToken: String? {
         get {
-            return getTokenFromKeychain()
+            // First check if we have a device token in UserDefaults (persistent across app launches)
+            let deviceTokenKey = "com.aivoicecopilot.deviceToken"
+            if let deviceToken = UserDefaults.standard.string(forKey: deviceTokenKey) {
+                print("🔑 authToken getter: Found device token in UserDefaults: \(deviceToken.prefix(20))...")
+                // Ensure it's also in keychain for consistency
+                let keychainToken = getTokenFromKeychain()
+                if keychainToken == nil {
+                    print("🔑 Device token exists but not in keychain, saving to keychain...")
+                    saveTokenToKeychain(deviceToken)
+                }
+                return deviceToken
+            }
+
+            // Fall back to checking keychain
+            let token = getTokenFromKeychain()
+            print("🔑 AuthService.authToken getter called, token exists: \(token != nil), length: \(token?.count ?? 0)")
+            return token
         }
         set {
             if let token = newValue {
+                print("🔑 AuthService.authToken setter called with token: \(token.prefix(20))...")
+                let deviceTokenKey = "com.aivoicecopilot.deviceToken"
+                UserDefaults.standard.set(token, forKey: deviceTokenKey)
                 saveTokenToKeychain(token)
             } else {
+                print("🔑 AuthService.authToken setter called with nil, deleting token")
+                let deviceTokenKey = "com.aivoicecopilot.deviceToken"
+                UserDefaults.standard.removeObject(forKey: deviceTokenKey)
                 deleteTokenFromKeychain()
             }
         }
     }
-    
+
     var isAuthenticated: Bool {
-        guard authToken != nil else { return false }
+        print("🔑 isAuthenticated called")
+        // Auto-authenticate with device token if no auth token exists
+        if authToken == nil {
+            print("🔑 No token found, generating device token...")
+            generateDeviceToken()
+        }
+        guard authToken != nil else {
+            print("❌ Still no token after generateDeviceToken()")
+            return false
+        }
         // Check if token is expired
         if let expiry = UserDefaults.standard.object(forKey: tokenExpiryKey) as? Date {
-            return expiry > Date()
+            let isValid = expiry > Date()
+            print("🔑 Token expiry check: \(isValid), expires: \(expiry)")
+            return isValid
         }
+        print("🔑 No expiry date found, assuming valid")
         return true
+    }
+
+    private func generateDeviceToken() {
+        print("🔑 generateDeviceToken() called")
+        // Generate a persistent device-based token
+        let deviceTokenKey = "com.aivoicecopilot.deviceToken"
+
+        if let existingToken = UserDefaults.standard.string(forKey: deviceTokenKey) {
+            print("🔑 Found existing device token: \(existingToken.prefix(20))...")
+            // Use existing device token
+            authToken = existingToken
+        } else {
+            // Create new device token (UUID-based)
+            let deviceId = UUID().uuidString
+            let deviceToken = "device_\(deviceId)"
+            print("🔑 Generated new device token: \(deviceToken.prefix(20))...")
+            UserDefaults.standard.set(deviceToken, forKey: deviceTokenKey)
+            authToken = deviceToken
+        }
+
+        // Set expiry far in the future (10 years)
+        let expiryDate = Date().addingTimeInterval(315360000)
+        print("🔑 Setting token expiry to: \(expiryDate)")
+        UserDefaults.standard.set(expiryDate, forKey: tokenExpiryKey)
     }
     
     // MARK: - Keychain Operations
     
     private func saveTokenToKeychain(_ token: String) {
+        print("🔑 saveTokenToKeychain() called with token: \(token.prefix(20))...")
         let data = token.data(using: .utf8)!
-        
+
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: tokenKey,
             kSecValueData as String: data,
             kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
         ]
-        
+
         // Delete existing item first
-        SecItemDelete(query as CFDictionary)
-        
+        let deleteStatus = SecItemDelete(query as CFDictionary)
+        print("🔑 Keychain delete status: \(deleteStatus)")
+
         // Add new item
         let status = SecItemAdd(query as CFDictionary, nil)
+        print("🔑 Keychain add status: \(status)")
         guard status == errSecSuccess else {
-            print("Failed to save token to keychain: \(status)")
+            print("❌ Failed to save token to keychain: \(status)")
             return
         }
+        print("✅ Token saved to keychain successfully")
     }
     
     private func getTokenFromKeychain() -> String? {
+        print("🔑 getTokenFromKeychain() called")
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: tokenKey,
             kSecReturnData as String: true
         ]
-        
+
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
-        
+        print("🔑 Keychain query status: \(status)")
+
         guard status == errSecSuccess,
               let data = result as? Data,
               let token = String(data: data, encoding: .utf8) else {
+            print("❌ Failed to retrieve token from keychain, status: \(status)")
             return nil
         }
-        
+
+        print("✅ Token retrieved from keychain: \(token.prefix(20))...")
         return token
     }
     

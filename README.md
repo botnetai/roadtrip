@@ -125,7 +125,7 @@ Your backend must implement:
 |----------|--------|-------------|
 | `/sessions/start` | POST | Start session, get LiveKit credentials |
 | `/sessions/end` | POST | End session |
-| `/sessions/:id/turn` | POST | Log conversation turn |
+| `/sessions/:id/turns` | POST | Log conversation turn |
 | `/sessions` | GET | Fetch session list |
 | `/sessions/:id` | GET | Fetch session details |
 | `/sessions/:id` | DELETE | Delete session |

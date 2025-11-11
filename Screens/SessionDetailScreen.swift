@@ -7,6 +7,7 @@ import SwiftUI
 
 struct SessionDetailScreen: View {
     let sessionID: String
+    @State private var session: Session?
     @State private var summary: SessionSummary?
     @State private var turns: [Turn] = []
     @State private var isLoading = false
@@ -37,6 +38,8 @@ struct SessionDetailScreen: View {
                 } else {
                     if let summary = summary {
                         SummarySection(summary: summary)
+                    } else if let session = session {
+                        ProcessingSummaryView(status: session.summaryStatus)
                     }
                     
                     if !turns.isEmpty {
@@ -77,19 +80,27 @@ struct SessionDetailScreen: View {
     private func loadSessionDetails() {
         isLoading = true
         errorMessage = nil
-        
+        session = nil
+        summary = nil
+        turns = []
+
         Task {
             do {
-                let (fetchedSummary, fetchedTurns) = try await SessionLogger.shared.fetchSessionDetail(sessionID: sessionID)
+                // Add a small delay to allow backend to finish processing the session
+                try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+
+                let detail = try await SessionLogger.shared.fetchSessionDetail(sessionID: sessionID)
                 await MainActor.run {
-                    self.summary = fetchedSummary
-                    self.turns = fetchedTurns
+                    self.session = detail.session
+                    self.summary = detail.summary
+                    self.turns = detail.turns
                     self.isLoading = false
                 }
             } catch {
                 await MainActor.run {
                     self.errorMessage = "Failed to load session: \(error.localizedDescription)"
                     self.isLoading = false
+                    print("📡 Session load error: \(error)")
                 }
             }
         }
@@ -163,6 +174,37 @@ struct SummarySection: View {
     }
 }
 
+struct ProcessingSummaryView: View {
+    let status: Session.SummaryStatus
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(status == .failed ? "Summary Unavailable" : "Processing Summary")
+                .font(.title2)
+                .fontWeight(.bold)
+            
+            switch status {
+            case .pending:
+                Text("We're still generating the session summary. This usually takes a few moments—pull down to refresh if it takes longer than expected.")
+                    .font(.body)
+                    .foregroundColor(.secondary)
+            case .ready:
+                Text("Summary will appear shortly. If it doesn't, try refreshing.")
+                    .font(.body)
+                    .foregroundColor(.secondary)
+            case .failed:
+                Text("We couldn't generate a summary for this session. You can still review the transcript below.")
+                    .font(.body)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.systemGray6))
+        .cornerRadius(12)
+    }
+}
+
 struct TranscriptSection: View {
     let turns: [Turn]
     
@@ -219,4 +261,3 @@ struct TranscriptBubble: View {
         SessionDetailScreen(sessionID: "test-id")
     }
 }
-

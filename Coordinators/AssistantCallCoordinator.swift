@@ -16,19 +16,20 @@ enum CallState {
 @MainActor
 class AssistantCallCoordinator: ObservableObject {
     static let shared = AssistantCallCoordinator()
-    
+
     @Published var callState: CallState = .idle
     @Published var currentSessionID: String?
     @Published var errorMessage: String?
-    
+
     private let callManager = CallManager.shared
     private let liveKitService = LiveKitService.shared
     private let sessionLogger = SessionLogger.shared
+    private let appCoordinator = AppCoordinator.shared
     private var cancellables = Set<AnyCancellable>()
-    
+
     // Store the context for when the call connects
     private var pendingContext: Session.SessionContext?
-    
+
     private init() {
         callManager.delegate = self
         liveKitService.delegate = self
@@ -53,21 +54,31 @@ class AssistantCallCoordinator: ObservableObject {
     
     func endAssistantCall() {
         guard callState != .idle else { return }
-        
+
         callState = .disconnecting
         errorMessage = nil
-        
+
+        // Store session ID before clearing it so we can navigate to it
+        let completedSessionID = currentSessionID
+
+        // Navigate to the session details immediately so the user sees progress
+        if let sessionID = completedSessionID {
+            appCoordinator.navigate(to: .sessionDetail(sessionID))
+        }
+
         // End LiveKit connection first
         liveKitService.disconnect()
-        
+
         // End CallKit call
         callManager.endCurrentCall()
-        
+
         // End session on backend
         if let sessionID = currentSessionID {
             Task {
                 do {
                     try await sessionLogger.endSession(sessionID: sessionID)
+
+                    // Nothing else to do here - navigation already happened
                 } catch {
                     await MainActor.run {
                         errorMessage = "Failed to end session: \(error.localizedDescription)"
@@ -77,7 +88,7 @@ class AssistantCallCoordinator: ObservableObject {
             }
             currentSessionID = nil
         }
-        
+
         pendingContext = nil
         callState = .idle
     }
