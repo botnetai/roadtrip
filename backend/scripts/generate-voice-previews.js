@@ -90,66 +90,120 @@ function getVoicesToGenerate(voices, existingPreviews, regenerateAll = false) {
 }
 
 async function generatePreview(voice, previewText) {
-  const livekitUrl = process.env.LIVEKIT_URL;
-  const apiKey = process.env.LIVEKIT_API_KEY;
-  const apiSecret = process.env.LIVEKIT_API_SECRET;
-  
-  if (!apiKey || !apiSecret || !livekitUrl) {
-    throw new Error('LiveKit credentials not configured');
-  }
-  
-  // Extract project ID from LiveKit URL
-  const urlMatch = livekitUrl.match(/wss?:\/\/([^.]+)\.livekit\.cloud/);
-  if (!urlMatch) {
-    throw new Error('Invalid LiveKit URL format');
-  }
-  
-  const projectId = urlMatch[1];
-  const inferenceUrl = `https://${projectId}.livekit.cloud/inference/v1/tts/synthesize`;
-  
   // Parse TTS identifier
   const [modelPart, voiceId] = voice.tts.split(':');
   const [provider, model] = modelPart.split('/');
-  
+
+  if (provider === 'cartesia') {
+    return generateCartesiaPreview(voiceId, previewText);
+  } else if (provider === 'elevenlabs') {
+    return generateElevenLabsPreview(voiceId, previewText);
+  } else {
+    throw new Error(`Unsupported provider: ${provider}`);
+  }
+}
+
+async function generateCartesiaPreview(voiceId, text) {
+  const apiKey = process.env.CARTESIA_API_KEY;
+  if (!apiKey) {
+    throw new Error('CARTESIA_API_KEY not configured');
+  }
+
   const requestBody = {
-    model: `${provider}/${model}`,
-    voice: voiceId,
-    text: previewText,
-    language: 'en'
+    model_id: 'sonic-3',
+    voice: {
+      mode: 'id',
+      id: voiceId
+    },
+    transcript: text,
+    language: 'en',
+    output_format: {
+      container: 'wav',
+      encoding: 'pcm_s16le',
+      sample_rate: 44100
+    }
   };
-  
-  const authHeader = Buffer.from(`${apiKey}:${apiSecret}`).toString('base64');
-  
+
   return new Promise((resolve, reject) => {
-    const urlObj = new URL(inferenceUrl);
     const options = {
-      hostname: urlObj.hostname,
-      port: urlObj.port || 443,
-      path: urlObj.pathname,
+      hostname: 'api.cartesia.ai',
+      port: 443,
+      path: '/tts/bytes',
       method: 'POST',
       headers: {
-        'Authorization': `Basic ${authHeader}`,
+        'X-API-Key': apiKey,
+        'Cartesia-Version': '2024-06-10',
         'Content-Type': 'application/json',
       }
     };
-    
+
     const req = https.request(options, (response) => {
       if (response.statusCode !== 200) {
         let errorBody = '';
         response.on('data', (chunk) => { errorBody += chunk; });
         response.on('end', () => {
-          reject(new Error(`API error ${response.statusCode}: ${errorBody}`));
+          reject(new Error(`Cartesia API error ${response.statusCode}: ${errorBody}`));
         });
         return;
       }
-      
+
       const chunks = [];
       response.on('data', (chunk) => chunks.push(chunk));
       response.on('end', () => {
         resolve(Buffer.concat(chunks));
       });
     });
-    
+
+    req.on('error', reject);
+    req.write(JSON.stringify(requestBody));
+    req.end();
+  });
+}
+
+async function generateElevenLabsPreview(voiceId, text) {
+  const apiKey = process.env.ELEVENLABS_API_KEY;
+  if (!apiKey) {
+    throw new Error('ELEVENLABS_API_KEY not configured - skipping ElevenLabs voices');
+  }
+
+  const requestBody = {
+    text: text,
+    model_id: 'eleven_turbo_v2_5',
+    voice_settings: {
+      stability: 0.5,
+      similarity_boost: 0.75
+    }
+  };
+
+  return new Promise((resolve, reject) => {
+    const options = {
+      hostname: 'api.elevenlabs.io',
+      port: 443,
+      path: `/v1/text-to-speech/${voiceId}`,
+      method: 'POST',
+      headers: {
+        'xi-api-key': apiKey,
+        'Content-Type': 'application/json',
+      }
+    };
+
+    const req = https.request(options, (response) => {
+      if (response.statusCode !== 200) {
+        let errorBody = '';
+        response.on('data', (chunk) => { errorBody += chunk; });
+        response.on('end', () => {
+          reject(new Error(`ElevenLabs API error ${response.statusCode}: ${errorBody}`));
+        });
+        return;
+      }
+
+      const chunks = [];
+      response.on('data', (chunk) => chunks.push(chunk));
+      response.on('end', () => {
+        resolve(Buffer.concat(chunks));
+      });
+    });
+
     req.on('error', reject);
     req.write(JSON.stringify(requestBody));
     req.end();
@@ -213,7 +267,7 @@ async function main() {
       const audioData = await generatePreview(voice, PREVIEW_TEXT);
       
       // Determine file extension based on provider
-      const extension = voice.provider === 'cartesia' ? 'm4a' : 'mp3';
+      const extension = voice.provider === 'cartesia' ? 'wav' : 'mp3';
       const filePath = join(previewsDir, `${voice.id}.${extension}`);
       
       await writeFile(filePath, audioData);

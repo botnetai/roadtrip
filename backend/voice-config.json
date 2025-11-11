@@ -2,39 +2,32 @@
   "previewText": "Hello, this is a preview of my voice. How do I sound?",
   "voices": [
     {
-      "id": "cartesia-coral",
-      "tts": "cartesia/sonic-3:9626c31c-bec5-4cca-baa8-f8ba9e84c8bc",
+      "id": "cartesia-katie",
+      "tts": "cartesia/sonic-3:f786b574-daa5-4673-aa0c-cbe3e8534c02",
       "provider": "cartesia",
-      "name": "Coral",
-      "description": "Warm and friendly voice"
+      "name": "Katie",
+      "description": "Professional female voice for agents"
     },
     {
-      "id": "cartesia-breeze",
-      "tts": "cartesia/sonic-3:b5c0c5c5-5c5c-5c5c-5c5c-5c5c5c5c5c5c",
+      "id": "cartesia-kiefer",
+      "tts": "cartesia/sonic-3:228fca29-3a0a-435c-8728-5cb483251068",
       "provider": "cartesia",
-      "name": "Breeze",
-      "description": "Calm and professional male voice"
+      "name": "Kiefer",
+      "description": "Professional male voice for agents"
     },
     {
-      "id": "cartesia-ember",
-      "tts": "cartesia/sonic-3:c6d1d6d6-d6d6-d6d6-d6d6-d6d6d6d6d6d6",
+      "id": "cartesia-tessa",
+      "tts": "cartesia/sonic-3:6ccbfb76-1fc6-48f7-b71d-91ac6298247b",
       "provider": "cartesia",
-      "name": "Ember",
-      "description": "Energetic and expressive voice"
+      "name": "Tessa",
+      "description": "Expressive and emotive female voice"
     },
     {
-      "id": "cartesia-nova",
-      "tts": "cartesia/sonic-3:d7e2e7e7-e7e7-e7e7-e7e7-e7e7e7e7e7e7",
+      "id": "cartesia-kyle",
+      "tts": "cartesia/sonic-3:c961b81c-a935-4c17-bfb3-ba2239de8c2f",
       "provider": "cartesia",
-      "name": "Nova",
-      "description": "Clear and articulate voice"
-    },
-    {
-      "id": "cartesia-zen",
-      "tts": "cartesia/sonic-3:e8f3f8f8-f8f8-f8f8-f8f8-f8f8f8f8f8f8",
-      "provider": "cartesia",
-      "name": "Zen",
-      "description": "Soothing and calm voice"
+      "name": "Kyle",
+      "description": "Expressive and emotive male voice"
     },
     {
       "id": "elevenlabs-rachel",
@@ -80,4 +73,3 @@
     }
   ]
 }
-
