@@ -46,16 +46,6 @@ struct SessionSummary: Codable {
     let actionItems: [String]
     let tags: [String]
     let createdAt: Date
-    
-    enum CodingKeys: String, CodingKey {
-        case id
-        case sessionId = "session_id"
-        case title
-        case summaryText = "summary_text"
-        case actionItems = "action_items"
-        case tags
-        case createdAt = "created_at"
-    }
 }
 
 struct Turn: Identifiable, Codable {
@@ -64,15 +54,7 @@ struct Turn: Identifiable, Codable {
     let timestamp: Date
     let speaker: Speaker
     let text: String
-    
-    enum CodingKeys: String, CodingKey {
-        case id
-        case sessionId = "session_id"
-        case timestamp
-        case speaker
-        case text
-    }
-    
+
     enum Speaker: String, Codable {
         case user
         case assistant
