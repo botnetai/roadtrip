@@ -24,7 +24,7 @@ import http from 'http';
 import path from 'path';
 import fs from 'fs';
 import db from './database.js';
-import { generateRoomName, generateLiveKitToken, getLiveKitUrl, logLiveKitConfig } from './livekit.js';
+import { generateRoomName, generateLiveKitToken, getLiveKitUrl, logLiveKitConfig, dispatchAgentToRoom } from './livekit.js';
 
 // Log LiveKit configuration after env is loaded and modules are imported
 logLiveKitConfig();
@@ -132,6 +132,11 @@ app.post('/v1/sessions/start', authenticateToken, async (req, res) => {
     }
     
     console.log(`Session ${sessionId} using TTS voice: ${selectedTTS}`);
+
+    // Dispatch agent to room (don't wait for it, run in background)
+    dispatchAgentToRoom(roomName, selectedModel, selectedTTS).catch(error => {
+      console.error(`Failed to dispatch agent for session ${sessionId}:`, error.message);
+    });
 
     res.json({
       session_id: sessionId,

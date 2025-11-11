@@ -1,4 +1,4 @@
-import { AccessToken } from 'livekit-server-sdk';
+import { AccessToken, RoomServiceClient } from 'livekit-server-sdk';
 import crypto from 'crypto';
 
 // Read environment variables lazily to ensure dotenv has loaded them
@@ -81,4 +81,34 @@ export function getLiveKitUrl() {
     throw new Error('LiveKit URL not configured: LIVEKIT_URL environment variable is missing');
   }
   return url;
+}
+
+export async function dispatchAgentToRoom(roomName, model, tts) {
+  const apiKey = getLiveKitApiKey();
+  const apiSecret = getLiveKitApiSecret();
+  const url = getLiveKitUrl();
+
+  if (!apiKey || !apiSecret || !url) {
+    throw new Error('LiveKit credentials not configured');
+  }
+
+  // Create RoomServiceClient for API calls
+  const roomService = new RoomServiceClient(url, apiKey, apiSecret);
+
+  // Agent metadata to pass to the LiveKit agent
+  const agentMetadata = JSON.stringify({
+    model: model || 'openai/gpt-4.1-mini',
+    tts: tts || 'cartesia/sonic-3:9626c31c-bec5-4cca-baa8-f8ba9e84c8bc',
+    instructions: 'You are a helpful voice AI assistant for CarPlay. Keep responses concise and clear for safe driving.'
+  });
+
+  try {
+    // Create agent dispatch
+    const dispatch = await roomService.createDispatch(roomName, 'agent', agentMetadata);
+    console.log(`✅ Agent dispatched to room ${roomName}:`, dispatch.id);
+    return dispatch;
+  } catch (error) {
+    console.error(`❌ Failed to dispatch agent to room ${roomName}:`, error.message);
+    throw error;
+  }
 }
