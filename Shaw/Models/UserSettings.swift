@@ -99,15 +99,14 @@ struct TTSVoice: Identifiable, Codable, Hashable {
         TTSVoice(id: "cartesia-kyle", provider: .cartesia, name: "Kyle", description: "Expressive and emotive male voice", voiceId: "c961b81c-a935-4c17-bfb3-ba2239de8c2f", previewURL: nil),
         
         // ElevenLabs voices (from LiveKit Inference)
-        // See: https://docs.livekit.io/agents/models/tts/inference/elevenlabs/
-        // Note: Voice IDs need to be fetched from LiveKit Inference API or documentation
-        // These are common ElevenLabs voice IDs - verify against actual LiveKit Inference offerings
+        // Popular conversational voices from ElevenLabs library
+        // Note: Direct API used for preview generation, LiveKit Inference used during live calls
         TTSVoice(id: "elevenlabs-rachel", provider: .elevenlabs, name: "Rachel", description: "Professional female voice", voiceId: "21m00Tcm4TlvDq8ikWAM", previewURL: nil),
-        TTSVoice(id: "elevenlabs-domi", provider: .elevenlabs, name: "Domi", description: "Confident female voice", voiceId: "AZnzlk1XvdvUeBnXmlld", previewURL: nil),
-        TTSVoice(id: "elevenlabs-bella", provider: .elevenlabs, name: "Bella", description: "Warm female voice", voiceId: "EXAVITQu4vr4xnSDxMaL", previewURL: nil),
-        TTSVoice(id: "elevenlabs-josh", provider: .elevenlabs, name: "Josh", description: "Professional male voice", voiceId: "TxGEqnHWrfWFTfGW9XjX", previewURL: nil),
-        TTSVoice(id: "elevenlabs-arnold", provider: .elevenlabs, name: "Arnold", description: "Deep male voice", voiceId: "VR6AewLTigWG4xSOukaG", previewURL: nil),
-        TTSVoice(id: "elevenlabs-adam", provider: .elevenlabs, name: "Adam", description: "Clear male voice", voiceId: "pNInz6obpgDQGcFmaJgB", previewURL: nil),
+        TTSVoice(id: "elevenlabs-clyde", provider: .elevenlabs, name: "Clyde", description: "Great for character use-cases", voiceId: "2EiwWnXFnvU5JabPnv8n", previewURL: nil),
+        TTSVoice(id: "elevenlabs-roger", provider: .elevenlabs, name: "Roger", description: "Easy going, perfect for casual conversations", voiceId: "CwhRBWXzGAHq8TQ4Fs17", previewURL: nil),
+        TTSVoice(id: "elevenlabs-sarah", provider: .elevenlabs, name: "Sarah", description: "Confident and warm young adult woman", voiceId: "EXAVITQu4vr4xnSDxMaL", previewURL: nil),
+        TTSVoice(id: "elevenlabs-laura", provider: .elevenlabs, name: "Laura", description: "Young adult female, delivers sunny upbeat energy", voiceId: "FGY2WhTYpPnrIDTdsKH5", previewURL: nil),
+        TTSVoice(id: "elevenlabs-charlie", provider: .elevenlabs, name: "Charlie", description: "Young Australian male, confident and natural", voiceId: "IKne3meq5aSn9XLyUdCD", previewURL: nil),
     ]
     
     static func voices(for provider: TTSProvider) -> [TTSVoice] {

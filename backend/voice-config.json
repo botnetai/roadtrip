@@ -37,39 +37,39 @@
       "description": "Professional female voice"
     },
     {
-      "id": "elevenlabs-domi",
-      "tts": "elevenlabs/eleven_turbo_v2_5:AZnzlk1XvdvUeBnXmlld",
+      "id": "elevenlabs-clyde",
+      "tts": "elevenlabs/eleven_turbo_v2_5:2EiwWnXFnvU5JabPnv8n",
       "provider": "elevenlabs",
-      "name": "Domi",
-      "description": "Confident female voice"
+      "name": "Clyde",
+      "description": "Great for character use-cases"
     },
     {
-      "id": "elevenlabs-bella",
+      "id": "elevenlabs-roger",
+      "tts": "elevenlabs/eleven_turbo_v2_5:CwhRBWXzGAHq8TQ4Fs17",
+      "provider": "elevenlabs",
+      "name": "Roger",
+      "description": "Easy going, perfect for casual conversations"
+    },
+    {
+      "id": "elevenlabs-sarah",
       "tts": "elevenlabs/eleven_turbo_v2_5:EXAVITQu4vr4xnSDxMaL",
       "provider": "elevenlabs",
-      "name": "Bella",
-      "description": "Warm female voice"
+      "name": "Sarah",
+      "description": "Confident and warm young adult woman"
     },
     {
-      "id": "elevenlabs-josh",
-      "tts": "elevenlabs/eleven_turbo_v2_5:TxGEqnHWrfWFTfGW9XjX",
+      "id": "elevenlabs-laura",
+      "tts": "elevenlabs/eleven_turbo_v2_5:FGY2WhTYpPnrIDTdsKH5",
       "provider": "elevenlabs",
-      "name": "Josh",
-      "description": "Professional male voice"
+      "name": "Laura",
+      "description": "Young adult female, delivers sunny upbeat energy"
     },
     {
-      "id": "elevenlabs-arnold",
-      "tts": "elevenlabs/eleven_turbo_v2_5:VR6AewLTigWG4xSOukaG",
+      "id": "elevenlabs-charlie",
+      "tts": "elevenlabs/eleven_turbo_v2_5:IKne3meq5aSn9XLyUdCD",
       "provider": "elevenlabs",
-      "name": "Arnold",
-      "description": "Deep male voice"
-    },
-    {
-      "id": "elevenlabs-adam",
-      "tts": "elevenlabs/eleven_turbo_v2_5:pNInz6obpgDQGcFmaJgB",
-      "provider": "elevenlabs",
-      "name": "Adam",
-      "description": "Clear male voice"
+      "name": "Charlie",
+      "description": "Young Australian male, confident and natural"
     }
   ]
 }
