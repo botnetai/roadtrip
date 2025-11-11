@@ -33,16 +33,19 @@ class AssistantCallCoordinator: ObservableObject {
         liveKitService.delegate = self
     }
     
-    func startAssistantCall(context: String) {
+    func startAssistantCall(context: String, enableLogging: Bool) {
         guard callState == .idle else { return }
-        
+
+        // Update logging setting
+        UserSettings.shared.loggingEnabled = enableLogging
+
         // Parse context string to SessionContext enum
         let sessionContext: Session.SessionContext = (context.lowercased() == "carplay") ? .carplay : .phone
         pendingContext = sessionContext
-        
+
         callState = .connecting
         errorMessage = nil
-        
+
         // Start CallKit call
         callManager.startAssistantCall()
     }

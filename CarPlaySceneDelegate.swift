@@ -32,8 +32,9 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
         )
         
         talkToAssistantItem.handler = { _, completion in
-            // Start assistant call from CarPlay context
-            AssistantCallCoordinator.shared.startAssistantCall(context: "carplay")
+            // Start assistant call from CarPlay context with current logging setting
+            let enableLogging = UserSettings.shared.loggingEnabled
+            AssistantCallCoordinator.shared.startAssistantCall(context: "carplay", enableLogging: enableLogging)
             completion()
         }
         
