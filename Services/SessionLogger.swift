@@ -229,8 +229,16 @@ class SessionLogger {
         } catch let decodingError as DecodingError {
             print("📡 Session detail decode failed for combined response, falling back to legacy endpoints: \(decodingError)")
             
-            // Legacy backend returned the session object directly. Decode that first.
-            let legacySession = try decoder.decode(Session.self, from: data)
+            let sessionData: Data
+            if let jsonObject = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let sessionDict = jsonObject["session"] as? [String: Any],
+               let encodedSession = try? JSONSerialization.data(withJSONObject: sessionDict) {
+                sessionData = encodedSession
+            } else {
+                sessionData = data
+            }
+            
+            let legacySession = try decoder.decode(Session.self, from: sessionData)
             
             async let turns = fetchSessionTurns(sessionID: sessionID)
             async let summary = fetchSessionSummary(sessionID: sessionID)

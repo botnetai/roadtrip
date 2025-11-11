@@ -42,6 +42,23 @@ if (fs.existsSync(previewsDir)) {
   console.log(`✅ Serving voice previews from: ${previewsDir}`);
 }
 
+const normalizeBoolean = (value) => {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value !== 0;
+  if (typeof value === 'string') {
+    return value === '1' || value.toLowerCase() === 'true';
+  }
+  return false;
+};
+
+const normalizeSession = (session) => {
+  if (!session) return null;
+  return {
+    ...session,
+    logging_enabled_snapshot: normalizeBoolean(session.logging_enabled_snapshot)
+  };
+};
+
 // Simple auth middleware (checks Bearer token exists)
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
@@ -310,13 +327,15 @@ app.get('/v1/sessions/:id', authenticateToken, (req, res) => {
   try {
     const sessionId = req.params.id;
 
-    const session = db.prepare(`
+    const sessionRow = db.prepare(`
       SELECT * FROM sessions WHERE id = ? AND user_id = ?
     `).get(sessionId, req.userId);
 
-    if (!session) {
+    if (!sessionRow) {
       return res.status(404).json({ error: 'Session not found' });
     }
+    
+    const session = normalizeSession(sessionRow);
 
     // Fetch summary if it exists
     const summaryStmt = db.prepare('SELECT * FROM summaries WHERE session_id = ?');

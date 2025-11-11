@@ -22,10 +22,9 @@ struct ContentView: View {
 
 struct MainAppView: View {
     @ObservedObject var appCoordinator = AppCoordinator.shared
-    @State private var selectedTab = 0
     
     var body: some View {
-        TabView(selection: $selectedTab) {
+        TabView(selection: $appCoordinator.selectedTab) {
             NavigationStack {
                 CallScreen()
             }
