@@ -92,10 +92,11 @@ echo "✅ LiveKit environment variables are set"
 # Start agent worker in background using virtual environment
 echo "🚀 Starting agent worker..."
 cd "$(dirname "$0")" || exit 1  # Ensure we're in the backend directory
-$PYTHON_CMD agent.py start > /tmp/agent.log 2>&1 &
+# Log to both file and stdout so Railway captures logs
+$PYTHON_CMD agent.py start 2>&1 | tee /tmp/agent.log &
 AGENT_PID=$!
 echo "✅ Agent worker process started (PID: $AGENT_PID)"
-echo "   Logs: /tmp/agent.log"
+echo "   Logs: /tmp/agent.log (also streaming to stdout)"
 
 # Wait for agent to initialize and connect
 echo "⏳ Waiting for agent worker to connect to LiveKit Cloud..."
