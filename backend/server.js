@@ -104,6 +104,11 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
+// Verify OpenAI API key is configured
+if (!process.env.OPENAI_API_KEY) {
+  console.warn('⚠️  OPENAI_API_KEY not set - summary generation will fail');
+}
+
 // Generate summary and title from transcription
 async function generateSummaryAndTitle(sessionId) {
   try {
