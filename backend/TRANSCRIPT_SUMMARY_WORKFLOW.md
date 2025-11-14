@@ -55,11 +55,9 @@ This document describes the complete workflow for capturing conversation transcr
   1. **Pull Transcript**: Queries all turns for the session, ordered by timestamp
   2. **Format Transcript**: Converts to `speaker: text` format
   3. **Generate Summary**: Uses GPT-5.1 Nano to create summary
-  4. **Extract Action Items**: Uses GPT-5.1 Nano to extract action items as JSON
-  5. **Generate Title**: Uses GPT-5.1 Nano to create short title
-  6. **Extract Tags**: Uses GPT-5.1 Nano to extract topic tags as JSON
-  7. **Save Summary**: Inserts into `summaries` table with foreign key to `sessions(id)`
-  8. **Update Status**: Sets `summary_status = 'ready'` on session
+  4. **Generate Title**: Uses GPT-5.1 Nano to create short title (runs in parallel with summary request)
+  5. **Save Summary**: Inserts into `summaries` table with foreign key to `sessions(id)` — action items & tags are stored as empty arrays for compatibility
+  6. **Update Status**: Sets `summary_status = 'ready'` on session
 - **Location**: `backend/server.js` line 107-256
 
 ### 8. Summary Retrieval
@@ -161,4 +159,3 @@ To verify the workflow is working:
 - [ ] Session `summary_status` is updated to 'ready'
 - [ ] GET endpoint returns summary when available
 - [ ] Summary is properly linked to session via foreign key
-

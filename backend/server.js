@@ -165,95 +165,51 @@ async function generateSummaryAndTitle(sessionId) {
     // Format transcript
     const transcript = turns.map(t => `${t.speaker}: ${t.text}`).join('\n');
 
-    // Generate summary using GPT-5.1 Nano via OpenAI API
-    const summaryResponse = await openai.chat.completions.create({
+    // Kick off summary + title generation in parallel
+    const summaryPromise = openai.chat.completions.create({
       model: 'gpt-5.1-nano',
       messages: [
         {
           role: 'system',
-          content: 'You are a helpful assistant that summarizes voice conversations. Provide a concise summary that captures the key topics, decisions, and action items discussed.'
+          content: 'You are a helpful assistant that summarizes voice conversations. Provide a concise narrative that captures the major topics, decisions, and follow-ups. Respond with only the summary text.'
         },
         {
           role: 'user',
-          content: `Summarize this conversation:\n\n${transcript}`
+          content: `Transcript:\n${transcript}`
         }
       ],
       max_completion_tokens: 500
     });
 
-    const summaryText = summaryResponse.choices[0]?.message?.content;
-    if (!summaryText) {
-      console.error('❌ GPT-5.1 Nano returned empty summary:', JSON.stringify(summaryResponse, null, 2));
-      throw new Error('GPT-5.1 Nano returned empty summary content');
-    }
-
-    // Extract action items
-    const actionItemsResponse = await openai.chat.completions.create({
+    const titlePromise = openai.chat.completions.create({
       model: 'gpt-5.1-nano',
       messages: [
         {
           role: 'system',
-          content: 'Extract action items from the summary as a JSON array of strings. If there are no action items, return an empty array.'
+          content: 'Generate a short, descriptive title (3-6 words) for this conversation. Return only the title, no punctuation or quotes.'
         },
         {
           role: 'user',
-          content: summaryText
-        }
-      ],
-      max_completion_tokens: 200,
-      response_format: { type: 'json_object' }
-    });
-
-    let actionItems = [];
-    try {
-      const parsed = JSON.parse(actionItemsResponse.choices[0].message.content);
-      actionItems = parsed.action_items || parsed.actions || [];
-    } catch (e) {
-      console.warn('Failed to parse action items:', e);
-    }
-
-    // Generate title from summary
-    const titleResponse = await openai.chat.completions.create({
-      model: 'gpt-5.1-nano',
-      messages: [
-        {
-          role: 'system',
-          content: 'Generate a short, descriptive title (3-6 words) for this conversation summary. Return only the title, no quotes or extra text.'
-        },
-        {
-          role: 'user',
-          content: summaryText
+          content: `Transcript:\n${transcript}`
         }
       ],
       max_completion_tokens: 20
     });
 
-    const title = titleResponse.choices[0].message.content.trim().replace(/^["']|["']$/g, '');
+    const [summaryResponse, titleResponse] = await Promise.all([summaryPromise, titlePromise]);
 
-    // Generate tags
-    const tagsResponse = await openai.chat.completions.create({
-      model: 'gpt-5.1-nano',
-      messages: [
-        {
-          role: 'system',
-          content: 'Extract 2-5 relevant topic tags from the summary as a JSON array of strings.'
-        },
-        {
-          role: 'user',
-          content: summaryText
-        }
-      ],
-      max_completion_tokens: 100,
-      response_format: { type: 'json_object' }
-    });
-
-    let tags = [];
-    try {
-      const parsed = JSON.parse(tagsResponse.choices[0].message.content);
-      tags = parsed.tags || [];
-    } catch (e) {
-      console.warn('Failed to parse tags:', e);
+    const summaryText = summaryResponse.choices[0]?.message?.content?.trim();
+    if (!summaryText) {
+      console.error('❌ GPT-5.1 Nano returned empty summary text:', JSON.stringify(summaryResponse, null, 2));
+      throw new Error('GPT-5.1 Nano returned empty summary text');
     }
+
+    const rawTitle = titleResponse.choices[0]?.message?.content || 'Untitled Session';
+    const title = rawTitle.trim().replace(/^["']|["']$/g, '');
+
+    // Action items and tags temporarily disabled (schema still expects arrays)
+    const actionItems = [];
+    const tags = [];
 
     // Save summary to database (linked to session via foreign key)
     const summaryId = crypto.randomUUID();
@@ -278,8 +234,8 @@ async function generateSummaryAndTitle(sessionId) {
     console.log(`✅ Summary generated and saved for session ${sessionId}:`);
     console.log(`   Title: "${title}"`);
     console.log(`   Summary ID: ${summaryId}`);
-    console.log(`   Action items: ${actionItems.length}`);
-    console.log(`   Tags: ${tags.length}`);
+    console.log('   Action items: disabled');
+    console.log('   Tags: disabled');
     console.log(`   Session summary_status updated to 'ready'`);
   } catch (error) {
     console.error(`❌ Failed to generate summary for session ${sessionId}:`, error.message);
