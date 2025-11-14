@@ -2,6 +2,7 @@ import os
 import logging
 import sys
 import asyncio
+import time
 import aiohttp
 from dotenv import load_dotenv
 from livekit import agents
@@ -48,6 +49,81 @@ def verify_env():
 
 # Backend API configuration
 BACKEND_URL = os.getenv('BACKEND_URL', 'https://shaw.up.railway.app')
+
+
+class TranscriptManager:
+    """Aggregates streamed transcription chunks and saves finalized turns."""
+
+    DEDUPE_WINDOW_SECONDS = 5.0
+
+    def __init__(self, session_id: str | None):
+        self._session_id = session_id
+        self._recent_turns: dict[str, dict[str, float]] = {
+            'user': {},
+            'assistant': {},
+        }
+        self._pending_user_partial: str | None = None
+
+    def handle_user_transcript_chunk(self, transcript: str, is_final: bool) -> None:
+        normalized = self._normalize_text(transcript)
+        if not normalized:
+            return
+
+        self._pending_user_partial = normalized
+        if is_final:
+            self._maybe_save_turn('user', normalized)
+            self._pending_user_partial = None
+
+    def handle_user_final_text(self, text: str | None) -> None:
+        normalized = self._normalize_text(text) or self._pending_user_partial
+        if normalized:
+            self._maybe_save_turn('user', normalized)
+            self._pending_user_partial = None
+
+    def handle_assistant_text(self, text: str | None) -> None:
+        normalized = self._normalize_text(text)
+        if normalized:
+            self._maybe_save_turn('assistant', normalized)
+
+    def handle_conversation_item(self, role: str | None, content: str | None) -> None:
+        if role not in ('user', 'assistant'):
+            return
+        normalized = self._normalize_text(content)
+        if normalized:
+            self._maybe_save_turn(role, normalized)
+
+    def _normalize_text(self, text: str | None) -> str:
+        if not text:
+            return ""
+        normalized = " ".join(text.strip().split())
+        return normalized
+
+    def _maybe_save_turn(self, speaker: str, text: str) -> None:
+        if not self._session_id or not text:
+            return
+
+        if self._is_duplicate(speaker, text):
+            logger.debug(f"🔁 Skipping duplicate {speaker} transcript chunk")
+            return
+
+        logger.debug(f"📝 Queueing {speaker} turn ({len(text)} chars)")
+        asyncio.create_task(save_turn(self._session_id, speaker, text))
+
+    def _is_duplicate(self, speaker: str, text: str) -> bool:
+        now = time.monotonic()
+        cache = self._recent_turns.setdefault(speaker, {})
+
+        expired = [phrase for phrase, ts in cache.items()
+                   if now - ts > self.DEDUPE_WINDOW_SECONDS]
+        for phrase in expired:
+            del cache[phrase]
+
+        last_seen = cache.get(text)
+        if last_seen and now - last_seen < self.DEDUPE_WINDOW_SECONDS:
+            return True
+
+        cache[text] = now
+        return False
 
 class Assistant(Agent):
     def __init__(self, tool_calling_enabled=True, web_search_enabled=True, stt_model: str | None = None, stt_language: str | None = None) -> None:
@@ -255,6 +331,7 @@ async def entrypoint(ctx: agents.JobContext):
     web_search_enabled = metadata.get('web_search_enabled', True)
 
     logger.info(f"🔧 Tool settings - Tool calling: {tool_calling_enabled}, Web search: {web_search_enabled}")
+    transcript_manager = TranscriptManager(session_id)
 
     try:
         if realtime_mode:
@@ -273,17 +350,21 @@ async def entrypoint(ctx: agents.JobContext):
 
             # Set up event handlers for transcription capture
             # Note: Event handlers must be synchronous - use asyncio.create_task for async work
+            @agent_session.on("user_input_transcribed")
+            def on_user_transcribed(event):
+                transcript_manager.handle_user_transcript_chunk(event.transcript, event.is_final)
+
             @agent_session.on("user_speech_committed")
             def on_user_speech(msg: agents.llm.ChatMessage):
-                if session_id and msg.content:
+                if msg.content:
                     logger.info(f"🗣️ Committed USER speech ({len(msg.content)} chars) — saving turn")
-                    asyncio.create_task(save_turn(session_id, "user", msg.content))
+                    transcript_manager.handle_user_final_text(msg.content)
 
             @agent_session.on("agent_speech_committed")
             def on_agent_speech(msg: agents.llm.ChatMessage):
-                if session_id and msg.content:
+                if msg.content:
                     logger.info(f"🗣️ Committed AGENT speech ({len(msg.content)} chars) — saving turn")
-                    asyncio.create_task(save_turn(session_id, "assistant", msg.content))
+                    transcript_manager.handle_assistant_text(msg.content)
 
             @agent_session.on("conversation_item_added")
             def on_conversation_item(item):
@@ -296,11 +377,7 @@ async def entrypoint(ctx: agents.JobContext):
                         content = getattr(item.message, "content")
                     if not role:
                         role = "assistant"
-                    if session_id and content and role in ("user", "assistant"):
-                        logger.info(f"🧾 Conversation item committed ({role}, {len(content)} chars) — saving turn")
-                        asyncio.create_task(save_turn(session_id, role, content))
-                    else:
-                        logger.debug(f"🧾 Conversation item ignored: role={role}, has_content={bool(content)}")
+                    transcript_manager.handle_conversation_item(role, content)
                 except Exception as e:
                     logger.error(f"❌ Error handling conversation_item_added: {e}")
 
@@ -359,15 +436,19 @@ async def entrypoint(ctx: agents.JobContext):
 
             # Set up event handlers for transcription capture
             # Note: Event handlers must be synchronous - use asyncio.create_task for async work
+            @agent_session.on("user_input_transcribed")
+            def on_user_transcribed(event):
+                transcript_manager.handle_user_transcript_chunk(event.transcript, event.is_final)
+
             @agent_session.on("user_speech_committed")
             def on_user_speech(msg: agents.llm.ChatMessage):
-                if session_id and msg.content:
-                    asyncio.create_task(save_turn(session_id, "user", msg.content))
+                if msg.content:
+                    transcript_manager.handle_user_final_text(msg.content)
 
             @agent_session.on("agent_speech_committed")
             def on_agent_speech(msg: agents.llm.ChatMessage):
-                if session_id and msg.content:
-                    asyncio.create_task(save_turn(session_id, "assistant", msg.content))
+                if msg.content:
+                    transcript_manager.handle_assistant_text(msg.content)
 
             @agent_session.on("conversation_item_added")
             def on_conversation_item(item):
@@ -380,11 +461,7 @@ async def entrypoint(ctx: agents.JobContext):
                         content = getattr(item.message, "content")
                     if not role:
                         role = "assistant"
-                    if session_id and content and role in ("user", "assistant"):
-                        logger.info(f"🧾 Conversation item committed ({role}, {len(content)} chars) — saving turn")
-                        asyncio.create_task(save_turn(session_id, role, content))
-                    else:
-                        logger.debug(f"🧾 Conversation item ignored: role={role}, has_content={bool(content)}")
+                    transcript_manager.handle_conversation_item(role, content)
                 except Exception as e:
                     logger.error(f"❌ Error handling conversation_item_added: {e}")
 
