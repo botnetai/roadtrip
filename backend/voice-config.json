@@ -2,74 +2,208 @@
   "previewText": "Hello, this is a preview of my voice. How do I sound?",
   "voices": [
     {
+      "id": "cartesia-jacqueline",
+      "tts": "cartesia/sonic-3:9626c31c-bec5-4cca-baa8-f8ba9e84c8bc",
+      "provider": "cartesia",
+      "name": "Jacqueline",
+      "description": "Confident young American woman",
+      "language": "en"
+    },
+    {
+      "id": "cartesia-blake",
+      "tts": "cartesia/sonic-3:a167e0f3-df7e-4d52-a9c3-f949145efdab",
+      "provider": "cartesia",
+      "name": "Blake",
+      "description": "Energetic American man",
+      "language": "en"
+    },
+    {
+      "id": "cartesia-robyn",
+      "tts": "cartesia/sonic-3:f31cc6a7-c1e8-4764-980c-60a361443dd1",
+      "provider": "cartesia",
+      "name": "Robyn",
+      "description": "Calm Australian woman",
+      "language": "en"
+    },
+    {
       "id": "cartesia-katie",
       "tts": "cartesia/sonic-3:f786b574-daa5-4673-aa0c-cbe3e8534c02",
       "provider": "cartesia",
       "name": "Katie",
-      "description": "Professional female voice for agents"
+      "description": "Professional English narrator",
+      "language": "en"
     },
     {
       "id": "cartesia-kiefer",
       "tts": "cartesia/sonic-3:228fca29-3a0a-435c-8728-5cb483251068",
       "provider": "cartesia",
       "name": "Kiefer",
-      "description": "Professional male voice for agents"
+      "description": "Polished baritone announcer",
+      "language": "en"
     },
     {
-      "id": "cartesia-tessa",
-      "tts": "cartesia/sonic-3:6ccbfb76-1fc6-48f7-b71d-91ac6298247b",
-      "provider": "cartesia",
-      "name": "Tessa",
-      "description": "Expressive and emotive female voice"
+      "id": "elevenlabs-jessica",
+      "tts": "elevenlabs/eleven_turbo_v2_5:cgSgspJ2msm6clMCkdW9",
+      "provider": "elevenlabs",
+      "name": "Jessica",
+      "description": "Playful American woman",
+      "language": "en"
     },
     {
-      "id": "cartesia-kyle",
-      "tts": "cartesia/sonic-3:c961b81c-a935-4c17-bfb3-ba2239de8c2f",
-      "provider": "cartesia",
-      "name": "Kyle",
-      "description": "Expressive and emotive male voice"
+      "id": "elevenlabs-chris",
+      "tts": "elevenlabs/eleven_turbo_v2_5:iP95p4xoKVk53GoZ742B",
+      "provider": "elevenlabs",
+      "name": "Chris",
+      "description": "Natural American man",
+      "language": "en"
+    },
+    {
+      "id": "elevenlabs-alice",
+      "tts": "elevenlabs/eleven_turbo_v2_5:Xb7hH8MSUJpSbSDYk0k2",
+      "provider": "elevenlabs",
+      "name": "Alice",
+      "description": "Friendly British woman",
+      "language": "en"
     },
     {
       "id": "elevenlabs-rachel",
       "tts": "elevenlabs/eleven_turbo_v2_5:21m00Tcm4TlvDq8ikWAM",
       "provider": "elevenlabs",
       "name": "Rachel",
-      "description": "Professional female voice"
-    },
-    {
-      "id": "elevenlabs-clyde",
-      "tts": "elevenlabs/eleven_turbo_v2_5:2EiwWnXFnvU5JabPnv8n",
-      "provider": "elevenlabs",
-      "name": "Clyde",
-      "description": "Great for character use-cases"
+      "description": "Balanced studio narrator",
+      "language": "en"
     },
     {
       "id": "elevenlabs-roger",
       "tts": "elevenlabs/eleven_turbo_v2_5:CwhRBWXzGAHq8TQ4Fs17",
       "provider": "elevenlabs",
       "name": "Roger",
-      "description": "Easy going, perfect for casual conversations"
+      "description": "Easygoing conversational tone",
+      "language": "en"
+    },
+    {
+      "id": "elevenlabs-clyde",
+      "tts": "elevenlabs/eleven_turbo_v2_5:2EiwWnXFnvU5JabPnv8n",
+      "provider": "elevenlabs",
+      "name": "Clyde",
+      "description": "Warm, confident storyteller",
+      "language": "en"
     },
     {
       "id": "elevenlabs-sarah",
       "tts": "elevenlabs/eleven_turbo_v2_5:EXAVITQu4vr4xnSDxMaL",
       "provider": "elevenlabs",
       "name": "Sarah",
-      "description": "Confident and warm young adult woman"
+      "description": "Bright, upbeat assistant",
+      "language": "en"
     },
     {
-      "id": "elevenlabs-laura",
+      "id": "cartesia-daniela",
+      "tts": "cartesia/sonic-3:5c5ad5e7-1020-476b-8b91-fdcbe9cc313c",
+      "provider": "cartesia",
+      "name": "Daniela",
+      "description": "Calida locutora mexicana",
+      "language": "es",
+      "previewText": "Hola, esta es una demostración de mi voz. ¿Cómo me escuchas?"
+    },
+    {
+      "id": "cartesia-marisol",
+      "tts": "cartesia/sonic-3:6ccbfb76-1fc6-48f7-b71d-91ac6298247b",
+      "provider": "cartesia",
+      "name": "Marisol",
+      "description": "Presentadora latina expresiva",
+      "language": "es",
+      "previewText": "Hola, esta es una vista previa de mi voz. ¿Qué te parece?"
+    },
+    {
+      "id": "cartesia-santiago",
+      "tts": "cartesia/sonic-3:c961b81c-a935-4c17-bfb3-ba2239de8c2f",
+      "provider": "cartesia",
+      "name": "Santiago",
+      "description": "Narrador mexicano confiable",
+      "language": "es",
+      "previewText": "Hola, estoy aquí para ayudarte. ¿Cómo sueno?"
+    },
+    {
+      "id": "elevenlabs-eric",
+      "tts": "elevenlabs/eleven_turbo_v2_5:cjVigY5qzO86Huf0OWal",
+      "provider": "elevenlabs",
+      "name": "Eric",
+      "description": "Hablante mexicano con voz suave",
+      "language": "es",
+      "previewText": "Hola, soy Eric. ¿Listo para hablar?"
+    },
+    {
+      "id": "elevenlabs-lucia",
       "tts": "elevenlabs/eleven_turbo_v2_5:FGY2WhTYpPnrIDTdsKH5",
       "provider": "elevenlabs",
-      "name": "Laura",
-      "description": "Young adult female, delivers sunny upbeat energy"
+      "name": "Lucía",
+      "description": "Guía latina optimista",
+      "language": "es",
+      "previewText": "Hola, esta es Lucía. ¿Cómo te puedo ayudar hoy?"
     },
     {
-      "id": "elevenlabs-charlie",
+      "id": "elevenlabs-diego",
       "tts": "elevenlabs/eleven_turbo_v2_5:IKne3meq5aSn9XLyUdCD",
       "provider": "elevenlabs",
-      "name": "Charlie",
-      "description": "Young Australian male, confident and natural"
+      "name": "Diego",
+      "description": "Acompañante latino relajado",
+      "language": "es",
+      "previewText": "Hola, soy Diego. ¿Cómo te sueno?"
+    },
+    {
+      "id": "elevenlabs-paloma",
+      "tts": "elevenlabs/eleven_turbo_v2_5:AZnzlk1XvdvUeBnXmlld",
+      "provider": "elevenlabs",
+      "name": "Paloma",
+      "description": "Conductora clara y cercana",
+      "language": "es",
+      "previewText": "Hola, soy Paloma. Esta es una muestra de mi voz."
+    },
+    {
+      "id": "elevenlabs-andres",
+      "tts": "elevenlabs/eleven_turbo_v2_5:TxGEqnHWrfWFTfGW9XjX",
+      "provider": "elevenlabs",
+      "name": "Andrés",
+      "description": "Voz masculina segura",
+      "language": "es",
+      "previewText": "Hola, estoy aquí para asistirte. ¿Cómo te sueno?"
+    },
+    {
+      "id": "elevenlabs-sergio",
+      "tts": "elevenlabs/eleven_turbo_v2_5:VR6AewLTigWG4xSOukaG",
+      "provider": "elevenlabs",
+      "name": "Sergio",
+      "description": "Locutor latino firme",
+      "language": "es",
+      "previewText": "Hola, mi nombre es Sergio. ¿Listo para comenzar?"
+    },
+    {
+      "id": "elevenlabs-valeria",
+      "tts": "elevenlabs/eleven_turbo_v2_5:pNInz6obpgDQGcFmaJgB",
+      "provider": "elevenlabs",
+      "name": "Valeria",
+      "description": "Voz cálida y cercana",
+      "language": "es",
+      "previewText": "Hola, soy Valeria. ¿Qué opinas de mi voz?"
+    },
+    {
+      "id": "elevenlabs-camila",
+      "tts": "elevenlabs/eleven_turbo_v2_5:ErXwobaYiN019PkySvjV",
+      "provider": "elevenlabs",
+      "name": "Camila",
+      "description": "Asistente latina dinámica",
+      "language": "es",
+      "previewText": "Hola, soy Camila. Así suena mi voz en español."
+    },
+    {
+      "id": "elevenlabs-javier",
+      "tts": "elevenlabs/eleven_turbo_v2_5:ZQe5CZNOzWyzPSCn5a3c",
+      "provider": "elevenlabs",
+      "name": "Javier",
+      "description": "Experto latino confiable",
+      "language": "es",
+      "previewText": "Hola, soy Javier. ¿Te gusta cómo hablo?"
     }
   ]
 }

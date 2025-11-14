@@ -12,7 +12,6 @@ import Combine
 class VoicePreviewService: NSObject, ObservableObject {
     static let shared = VoicePreviewService()
     
-    private let previewText = "Hello, this is a preview of my voice. How do I sound?"
     private var audioPlayers: [String: AVAudioPlayer] = [:]
     private var previewCache: [String: URL] = [:]
     @Published var playingVoiceId: String?
@@ -81,39 +80,7 @@ class VoicePreviewService: NSObject, ObservableObject {
     /// Map voice ID to preview file name
     /// Maps the app's voice IDs to the backend preview file names
     private func getPreviewFileName(for voice: TTSVoice) -> String {
-        // Map voice IDs to preview file names
-        // This mapping is needed because the app's voice IDs don't match the backend preview file names
-        
-        switch voice.id {
-        // Cartesia voices - map to available preview files
-        case "cartesia/sonic-3:9626c31c-bec5-4cca-baa8-f8ba9e84c8bc": // Jacqueline
-            return "cartesia-katie"
-        case "cartesia/sonic-3:a167e0f3-df7e-4d52-a9c3-f949145efdab": // Blake
-            return "cartesia-kiefer"
-        case "cartesia/sonic-3:f31cc6a7-c1e8-4764-980c-60a361443dd1": // Robyn
-            return "cartesia-tessa"
-        case "cartesia/sonic-3:5c5ad5e7-1020-476b-8b91-fdcbe9cc313c": // Daniela
-            return "cartesia-kyle"
-            
-        // ElevenLabs voices - map to available preview files
-        case "elevenlabs/eleven_turbo_v2_5:cgSgspJ2msm6clMCkdW9": // Jessica
-            return "elevenlabs-rachel"
-        case "elevenlabs/eleven_turbo_v2_5:iP95p4xoKVk53GoZ742B": // Chris
-            return "elevenlabs-clyde"
-        case "elevenlabs/eleven_turbo_v2_5:Xb7hH8MSUJpSbSDYk0k2": // Alice
-            return "elevenlabs-laura"
-        case "elevenlabs/eleven_turbo_v2_5:cjVigY5qzO86Huf0OWal": // Eric
-            return "elevenlabs-roger"
-            
-        // OpenAI Realtime voices - prefix with "openai-"
-        case "alloy", "echo", "fable", "onyx", "nova", "shimmer":
-            return "openai-\(voice.id)"
-            
-        // Default: try to use the voice ID as-is (for backwards compatibility)
-        default:
-            return voice.id.replacingOccurrences(of: "/", with: "-")
-                .replacingOccurrences(of: ":", with: "-")
-        }
+        return voice.previewIdentifier
     }
     
     /// Get preview audio URL (pre-generated static file)
@@ -224,4 +191,3 @@ enum VoicePreviewError: LocalizedError {
         }
     }
 }
-

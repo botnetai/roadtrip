@@ -35,8 +35,6 @@ class UserSettings: ObservableObject {
     @Published var selectedLanguage: VoiceLanguage {
         didSet {
             UserDefaults.standard.set(selectedLanguage.rawValue, forKey: "selectedLanguage")
-            guard !isInitializing else { return }
-            ensureSelectedVoiceMatchesLanguage()
         }
     }
 
@@ -91,35 +89,37 @@ class UserSettings: ObservableObject {
         // Load selected model
         if let data = UserDefaults.standard.data(forKey: "selectedModel"),
            let model = try? JSONDecoder().decode(AIModel.self, from: data) {
-            // Migrate from old defaults to new default (GPT-5 Nano)
+            // Migrate from old defaults to new default (GPT-5.1 Nano)
             // This ensures users get the latest default even if they had an old default saved
-            if model == .gpt5Mini || model == .gpt41Nano {
-                self.selectedModel = .gpt5Nano
+            if model == .gpt51Mini {
+                self.selectedModel = .gpt51Nano
             } else {
                 self.selectedModel = model
             }
         } else {
-            self.selectedModel = .gpt5Nano
+            self.selectedModel = .gpt51Nano
         }
 
-        if let storedLanguage = UserDefaults.standard.string(forKey: "selectedLanguage"),
-           let language = VoiceLanguage(rawValue: storedLanguage) {
-            self.selectedLanguage = language
-        } else {
-            self.selectedLanguage = VoiceLanguage.defaultLanguage
-        }
+        let storedLanguage = UserDefaults.standard.string(forKey: "selectedLanguage")
+        var resolvedLanguage = storedLanguage.flatMap { VoiceLanguage(rawValue: $0) } ?? VoiceLanguage.defaultLanguage
 
         // Load selected voice (default to Cartesia Sonic 3)
+        let storedVoice: TTSVoice?
         if let data = UserDefaults.standard.data(forKey: "selectedVoice"),
            let voice = try? JSONDecoder().decode(TTSVoice.self, from: data) {
-            self.selectedVoice = voice
+            storedVoice = voice
         } else {
-            // Default to Cartesia Sonic 3 - Jacqueline
-            self.selectedVoice = TTSVoice.default
+            storedVoice = nil
         }
-        if self.selectedVoice.language != self.selectedLanguage {
-            self.selectedLanguage = self.selectedVoice.language
+        let initialVoice = storedVoice ?? TTSVoice.default
+        var resolvedVoice = initialVoice
+
+        if resolvedVoice.language != resolvedLanguage {
+            resolvedLanguage = resolvedVoice.language
         }
+
+        self.selectedLanguage = resolvedLanguage
+        self.selectedVoice = resolvedVoice
 
         // Load tool calling settings (default to enabled)
         // Load both values first, then set them in any order since didSet dependency logic
@@ -138,16 +138,5 @@ class UserSettings: ObservableObject {
         
         // Mark initialization as complete - dependency logic will now apply to future changes
         isInitializing = false
-        ensureSelectedVoiceMatchesLanguage()
-    }
-
-    private func ensureSelectedVoiceMatchesLanguage() {
-        guard selectedVoice.language != selectedLanguage else { return }
-        if let replacement = TTSVoice.voices(for: selectedLanguage).first {
-            selectedVoice = replacement
-        } else {
-            selectedVoice = TTSVoice.default
-            selectedLanguage = TTSVoice.default.language
-        }
     }
 }

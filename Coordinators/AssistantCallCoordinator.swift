@@ -65,7 +65,7 @@ class AssistantCallCoordinator: ObservableObject {
         callManager.startAssistantCall()
     }
     
-    func endAssistantCall() {
+    func endAssistantCall(navigateToSession: Bool = true) {
         guard callState != .idle else { return }
 
         callState = .disconnecting
@@ -85,7 +85,7 @@ class AssistantCallCoordinator: ObservableObject {
         let completedSessionID = currentSessionID
 
         // Navigate to the session details immediately so the user sees progress
-        if let sessionID = completedSessionID {
+        if navigateToSession, let sessionID = completedSessionID {
             appCoordinator.navigate(to: .sessionDetail(sessionID))
         }
 
@@ -258,7 +258,7 @@ extension AssistantCallCoordinator: LiveKitServiceDelegate {
         print("❌ Error type: \(type(of: error))")
         print("❌ Error description: \(error.localizedDescription)")
         errorMessage = "Connection failed: \(error.localizedDescription)"
-        endAssistantCall()
+        endAssistantCall(navigateToSession: false)
     }
 
     func liveKitServiceDidDetectActivity() {

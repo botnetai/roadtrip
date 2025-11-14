@@ -40,7 +40,7 @@ struct CallScreen: View {
                         } header: {
                             Text("Language")
                         } footer: {
-                            Text("Filters voice options and updates speech recognition.")
+                            Text("Sets speech recognition and assistant defaults. You can pick any voice regardless of language.")
                         }
 
                         Section {
@@ -488,7 +488,7 @@ struct VoicePickerView: View {
 
     private var providerSections: [(provider: TTSProvider, voices: [TTSVoice])] {
         TTSProvider.allCases.compactMap { provider in
-            let voices = TTSVoice.voices(for: provider, language: settings.selectedLanguage)
+            let voices = TTSVoice.voices(for: provider)
             return voices.isEmpty ? nil : (provider, voices)
         }
     }
@@ -496,7 +496,7 @@ struct VoicePickerView: View {
     var body: some View {
         List {
             if providerSections.isEmpty {
-                Text("No voices are available for \(settings.selectedLanguage.displayName). Please select another language.")
+                Text("No voices are available. Check your configuration.")
                     .font(.footnote)
                     .foregroundColor(.secondary)
                     .padding(.vertical, 8)
@@ -599,6 +599,14 @@ struct VoicePickerRow: View {
                 Text(voice.description)
                     .font(.caption)
                     .foregroundColor(.secondary)
+                Text(voice.language.displayName)
+                    .font(.caption2)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color(.systemGray6))
+                    .cornerRadius(4)
             }
 
             Spacer()

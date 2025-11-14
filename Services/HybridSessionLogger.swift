@@ -101,17 +101,26 @@ class HybridSessionLogger: ObservableObject {
             }
 
             isLoading = false
-        } catch {
-            if error is CancellationError {
+        } catch let fetchError {
+            if fetchError is CancellationError {
                 isLoading = false
                 return
             }
-            self.error = error
-            isLoading = false
+
+            if let urlError = fetchError as? URLError, urlError.code == .cancelled {
+                isLoading = false
+                return
+            }
 
             if let backendSessions = try? await backend.fetchSessions() {
                 sessions = backendSessions
+                self.error = nil
+                isLoading = false
+                return
             }
+
+            self.error = fetchError
+            isLoading = false
         }
     }
 

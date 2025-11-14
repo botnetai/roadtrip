@@ -54,10 +54,10 @@ This document describes the complete workflow for capturing conversation transcr
 - **Steps**:
   1. **Pull Transcript**: Queries all turns for the session, ordered by timestamp
   2. **Format Transcript**: Converts to `speaker: text` format
-  3. **Generate Summary**: Uses GPT-5-nano to create summary
-  4. **Extract Action Items**: Uses GPT-5-nano to extract action items as JSON
-  5. **Generate Title**: Uses GPT-5-nano to create short title
-  6. **Extract Tags**: Uses GPT-5-nano to extract topic tags as JSON
+  3. **Generate Summary**: Uses GPT-5.1 Nano to create summary
+  4. **Extract Action Items**: Uses GPT-5.1 Nano to extract action items as JSON
+  5. **Generate Title**: Uses GPT-5.1 Nano to create short title
+  6. **Extract Tags**: Uses GPT-5.1 Nano to extract topic tags as JSON
   7. **Save Summary**: Inserts into `summaries` table with foreign key to `sessions(id)`
   8. **Update Status**: Sets `summary_status = 'ready'` on session
 - **Location**: `backend/server.js` line 107-256

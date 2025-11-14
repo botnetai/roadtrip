@@ -165,9 +165,9 @@ async function generateSummaryAndTitle(sessionId) {
     // Format transcript
     const transcript = turns.map(t => `${t.speaker}: ${t.text}`).join('\n');
 
-    // Generate summary using GPT-5-nano via OpenAI API
+    // Generate summary using GPT-5.1 Nano via OpenAI API
     const summaryResponse = await openai.chat.completions.create({
-      model: 'gpt-5-nano',
+      model: 'gpt-5.1-nano',
       messages: [
         {
           role: 'system',
@@ -183,13 +183,13 @@ async function generateSummaryAndTitle(sessionId) {
 
     const summaryText = summaryResponse.choices[0]?.message?.content;
     if (!summaryText) {
-      console.error('❌ GPT-5-nano returned empty summary:', JSON.stringify(summaryResponse, null, 2));
-      throw new Error('GPT-5-nano returned empty summary content');
+      console.error('❌ GPT-5.1 Nano returned empty summary:', JSON.stringify(summaryResponse, null, 2));
+      throw new Error('GPT-5.1 Nano returned empty summary content');
     }
 
     // Extract action items
     const actionItemsResponse = await openai.chat.completions.create({
-      model: 'gpt-5-nano',
+      model: 'gpt-5.1-nano',
       messages: [
         {
           role: 'system',
@@ -214,7 +214,7 @@ async function generateSummaryAndTitle(sessionId) {
 
     // Generate title from summary
     const titleResponse = await openai.chat.completions.create({
-      model: 'gpt-5-nano',
+      model: 'gpt-5.1-nano',
       messages: [
         {
           role: 'system',
@@ -232,7 +232,7 @@ async function generateSummaryAndTitle(sessionId) {
 
     // Generate tags
     const tagsResponse = await openai.chat.completions.create({
-      model: 'gpt-5-nano',
+      model: 'gpt-5.1-nano',
       messages: [
         {
           role: 'system',
@@ -521,9 +521,9 @@ app.post('/v1/sessions/start', authenticateToken, async (req, res) => {
     // See: https://docs.livekit.io/agents/models/#inference
     const validModels = [
       // OpenAI models available through LiveKit Inference
-      'openai/gpt-4.1',
-      'openai/gpt-4.1-mini',
-      'openai/gpt-4.1-nano',
+      'openai/gpt-5.1',
+      'openai/gpt-5.1-mini',
+      'openai/gpt-5.1-nano',
       // Anthropic models available through LiveKit Inference
       'claude-sonnet-4-5',
       'claude-haiku-4-5',
@@ -534,11 +534,12 @@ app.post('/v1/sessions/start', authenticateToken, async (req, res) => {
 
     // Pro-only models require active subscription
     const proOnlyModels = [
+      'openai/gpt-5.1',
       'claude-sonnet-4-5',
       'google/gemini-2.5-pro'
     ];
 
-    const selectedModel = useRealtimeMode ? null : (model && validModels.includes(model) ? model : 'openai/gpt-4.1-mini');
+    const selectedModel = useRealtimeMode ? null : (model && validModels.includes(model) ? model : 'openai/gpt-5.1-nano');
 
     // Check if user is trying to use a Pro-only model without Pro subscription
     if (selectedModel && proOnlyModels.includes(selectedModel)) {
@@ -551,6 +552,9 @@ app.post('/v1/sessions/start', authenticateToken, async (req, res) => {
         });
       }
     }
+
+    const normalizedToolCalling = tool_calling_enabled === undefined ? true : normalizeBoolean(tool_calling_enabled);
+    const normalizedWebSearch = web_search_enabled === undefined ? true : normalizeBoolean(web_search_enabled);
 
     const sessionId = `session-${crypto.randomUUID()}`;
     const roomName = generateRoomName();
@@ -584,6 +588,7 @@ app.post('/v1/sessions/start', authenticateToken, async (req, res) => {
       console.log(`  TTS voice: ${selectedVoice}`);
     }
     console.log(`  Language: ${normalizedLanguage} (${languageLabel})`);
+    console.log(`  Tool calling: ${normalizedToolCalling ? 'enabled' : 'disabled'} | Web search: ${normalizedWebSearch ? 'enabled' : 'disabled'}`);
 
     // Dispatch agent to room with verification (runs in background, but logs verification results)
     // Verification ensures the agent actually joins before the client starts speaking
@@ -593,8 +598,8 @@ app.post('/v1/sessions/start', authenticateToken, async (req, res) => {
       selectedModel,
       selectedVoice,
       useRealtimeMode,
-      tool_calling_enabled,
-      web_search_enabled,
+      normalizedToolCalling,
+      normalizedWebSearch,
       normalizedLanguage,
       languageLabel,
       true
@@ -616,7 +621,7 @@ app.post('/v1/sessions/start', authenticateToken, async (req, res) => {
       livekit_token: livekitToken,
       room_name: roomName,
       mode: useRealtimeMode ? 'realtime' : 'hybrid',
-      model: selectedModel || (useRealtimeMode ? 'openai-realtime' : 'openai/gpt-4.1-mini'),
+      model: selectedModel || (useRealtimeMode ? 'openai-realtime' : 'openai/gpt-5.1-nano'),
       voice: selectedVoice,
       language: normalizedLanguage
     });

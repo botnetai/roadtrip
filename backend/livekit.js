@@ -208,7 +208,7 @@ async function dispatchAgentWithRetry(roomName, sessionId, model, voice, realtim
   const agentMetadata = JSON.stringify({
     session_id: sessionId,
     realtime: realtime || false,
-    model: model || 'openai/gpt-4.1-mini',
+    model: model || 'openai/gpt-5.1-nano',
     voice: voice || (realtime ? 'alloy' : 'cartesia/sonic-3:9626c31c-bec5-4cca-baa8-f8ba9e84c8bc'),
     instructions: 'You are a helpful voice AI assistant for CarPlay. Keep responses concise and clear for safe driving.',
     tool_calling_enabled: toolCallingEnabled !== undefined ? toolCallingEnabled : true,

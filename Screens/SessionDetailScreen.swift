@@ -52,6 +52,11 @@ struct SessionDetailScreen: View {
                     }
                     .padding()
                 } else {
+                    if let session = session {
+                        SessionHeaderView(session: session, summaryTitle: summary?.title)
+                        SessionMetadataSection(session: session)
+                    }
+
                     if let summary = summary {
                         SummarySection(
                             summary: summary,
@@ -394,6 +399,42 @@ struct SummarySection: View {
                 }
             }
         }
+    }
+}
+
+struct SessionHeaderView: View {
+    let session: Session
+    let summaryTitle: String?
+
+    private var displayTitle: String {
+        if let summaryTitle = summaryTitle, !summaryTitle.isEmpty {
+            return summaryTitle
+        }
+
+        let suffix = session.id.split(separator: "-").last.map(String.init) ?? session.id
+        return "Session \(suffix.uppercased())"
+    }
+
+    private var formattedDate: String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .long
+        formatter.timeStyle = .short
+        return formatter.string(from: session.startedAt)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(displayTitle)
+                .font(.title)
+                .fontWeight(.bold)
+                .accessibilityIdentifier("session_title")
+
+            Text("Recorded \(formattedDate)")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .accessibilityIdentifier("session_recorded_date")
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

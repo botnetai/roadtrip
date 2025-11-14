@@ -47,17 +47,17 @@ async function loadVoiceConfig() {
     return {
       previewText: "Hello, this is a preview of my voice. How do I sound?",
       voices: [
-        { id: 'cartesia-coral', tts: 'cartesia/sonic-3:9626c31c-bec5-4cca-baa8-f8ba9e84c8bc', provider: 'cartesia' },
-        { id: 'cartesia-breeze', tts: 'cartesia/sonic-3:b5c0c5c5-5c5c-5c5c-5c5c-5c5c5c5c5c5c', provider: 'cartesia' },
-        { id: 'cartesia-ember', tts: 'cartesia/sonic-3:c6d1d6d6-d6d6-d6d6-d6d6-d6d6d6d6d6d6', provider: 'cartesia' },
-        { id: 'cartesia-nova', tts: 'cartesia/sonic-3:d7e2e7e7-e7e7-e7e7-e7e7-e7e7e7e7e7e7', provider: 'cartesia' },
-        { id: 'cartesia-zen', tts: 'cartesia/sonic-3:e8f3f8f8-f8f8-f8f8-f8f8-f8f8f8f8f8f8', provider: 'cartesia' },
-        { id: 'elevenlabs-rachel', tts: 'elevenlabs/eleven_turbo_v2_5:21m00Tcm4TlvDq8ikWAM', provider: 'elevenlabs' },
-        { id: 'elevenlabs-domi', tts: 'elevenlabs/eleven_turbo_v2_5:AZnzlk1XvdvUeBnXmlld', provider: 'elevenlabs' },
-        { id: 'elevenlabs-bella', tts: 'elevenlabs/eleven_turbo_v2_5:EXAVITQu4vr4xnSDxMaL', provider: 'elevenlabs' },
-        { id: 'elevenlabs-josh', tts: 'elevenlabs/eleven_turbo_v2_5:TxGEqnHWrfWFTfGW9XjX', provider: 'elevenlabs' },
-        { id: 'elevenlabs-arnold', tts: 'elevenlabs/eleven_turbo_v2_5:VR6AewLTigWG4xSOukaG', provider: 'elevenlabs' },
-        { id: 'elevenlabs-adam', tts: 'elevenlabs/eleven_turbo_v2_5:pNInz6obpgDQGcFmaJgB', provider: 'elevenlabs' },
+        { id: 'cartesia-coral', tts: 'cartesia/sonic-3:9626c31c-bec5-4cca-baa8-f8ba9e84c8bc', provider: 'cartesia', language: 'en' },
+        { id: 'cartesia-breeze', tts: 'cartesia/sonic-3:b5c0c5c5-5c5c-5c5c-5c5c-5c5c5c5c5c5c', provider: 'cartesia', language: 'en' },
+        { id: 'cartesia-ember', tts: 'cartesia/sonic-3:c6d1d6d6-d6d6-d6d6-d6d6-d6d6d6d6d6d6', provider: 'cartesia', language: 'en' },
+        { id: 'cartesia-nova', tts: 'cartesia/sonic-3:d7e2e7e7-e7e7-e7e7-e7e7-e7e7e7e7e7e7', provider: 'cartesia', language: 'en' },
+        { id: 'cartesia-zen', tts: 'cartesia/sonic-3:e8f3f8f8-f8f8-f8f8-f8f8-f8f8f8f8f8f8', provider: 'cartesia', language: 'en' },
+        { id: 'elevenlabs-rachel', tts: 'elevenlabs/eleven_turbo_v2_5:21m00Tcm4TlvDq8ikWAM', provider: 'elevenlabs', language: 'en' },
+        { id: 'elevenlabs-domi', tts: 'elevenlabs/eleven_turbo_v2_5:AZnzlk1XvdvUeBnXmlld', provider: 'elevenlabs', language: 'en' },
+        { id: 'elevenlabs-bella', tts: 'elevenlabs/eleven_turbo_v2_5:EXAVITQu4vr4xnSDxMaL', provider: 'elevenlabs', language: 'en' },
+        { id: 'elevenlabs-josh', tts: 'elevenlabs/eleven_turbo_v2_5:TxGEqnHWrfWFTfGW9XjX', provider: 'elevenlabs', language: 'en' },
+        { id: 'elevenlabs-arnold', tts: 'elevenlabs/eleven_turbo_v2_5:VR6AewLTigWG4xSOukaG', provider: 'elevenlabs', language: 'en' },
+        { id: 'elevenlabs-adam', tts: 'elevenlabs/eleven_turbo_v2_5:pNInz6obpgDQGcFmaJgB', provider: 'elevenlabs', language: 'en' },
       ]
     };
   }
@@ -87,6 +87,20 @@ function getVoicesToGenerate(voices, existingPreviews, regenerateAll = false) {
   }
   
   return voices.filter(voice => !existingPreviews.has(voice.id));
+}
+
+const DEFAULT_SPANISH_PREVIEW = "Hola, esta es una demostración de mi voz. ¿Cómo te sueno?";
+
+function resolvePreviewText(voice, defaultPreview) {
+  if (voice.previewText && voice.previewText.trim().length > 0) {
+    return voice.previewText;
+  }
+
+  if ((voice.language || '').toLowerCase() === 'es') {
+    return DEFAULT_SPANISH_PREVIEW;
+  }
+
+  return defaultPreview;
 }
 
 async function generatePreview(voice, previewText) {
@@ -264,7 +278,8 @@ async function main() {
   for (const voice of voicesToGenerate) {
     try {
       console.log(`🎵 Generating preview for ${voice.id}...`);
-      const audioData = await generatePreview(voice, PREVIEW_TEXT);
+      const previewText = resolvePreviewText(voice, PREVIEW_TEXT);
+      const audioData = await generatePreview(voice, previewText);
       
       // Determine file extension based on provider
       const extension = voice.provider === 'cartesia' ? 'wav' : 'mp3';
@@ -294,4 +309,3 @@ async function main() {
 }
 
 main().catch(console.error);
-

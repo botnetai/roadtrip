@@ -413,7 +413,7 @@ async def entrypoint(ctx: agents.JobContext):
 
     realtime_mode = metadata.get('realtime', False)  # Backend sends true for full Realtime, false for hybrid
     voice = metadata.get('voice', 'cartesia/sonic-3:9626c31c-bec5-4cca-baa8-f8ba9e84c8bc')
-    model = metadata.get('model', 'openai/gpt-4.1-mini')
+    model = metadata.get('model', 'openai/gpt-5.1-nano')
     tool_calling_enabled = metadata.get('tool_calling_enabled', True)
     web_search_enabled = metadata.get('web_search_enabled', True)
     language = metadata.get('language', 'en-US')
@@ -512,9 +512,9 @@ async def entrypoint(ctx: agents.JobContext):
             logger.info(f"📢 TTS voice: {voice}")
 
             # Use LiveKit Inference for LLM (not OpenAI Realtime)
-            # Model format: "openai/gpt-5-mini", "openai/gpt-4.1-mini", etc.
+            # Model format: "openai/gpt-5.1", "openai/gpt-5.1-mini", etc.
             # LiveKit Inference handles the connection automatically
-            llm_model = model or "openai/gpt-4.1-mini"
+            llm_model = model or "openai/gpt-5.1-nano"
 
             # Create TTS instance - use plugin if available (bypasses LiveKit Inference TTS limit)
             # Otherwise fall back to LiveKit Inference
