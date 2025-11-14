@@ -37,6 +37,7 @@ if (usePostgres) {
           ended_at TIMESTAMPTZ,
           logging_enabled_snapshot BOOLEAN NOT NULL,
           summary_status TEXT DEFAULT 'pending',
+          summary_error TEXT,
           model TEXT,
           duration_minutes INTEGER
         );
@@ -109,6 +110,7 @@ if (usePostgres) {
 
         ALTER TABLE sessions ADD COLUMN IF NOT EXISTS original_transaction_id TEXT;
         ALTER TABLE sessions ADD COLUMN IF NOT EXISTS entitlement_checked_at TIMESTAMPTZ;
+        ALTER TABLE sessions ADD COLUMN IF NOT EXISTS summary_error TEXT;
 
         CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
         CREATE INDEX IF NOT EXISTS idx_turns_session_id ON turns(session_id);
@@ -198,6 +200,7 @@ if (usePostgres) {
       ended_at TEXT,
       logging_enabled_snapshot INTEGER NOT NULL,
       summary_status TEXT DEFAULT 'pending',
+      summary_error TEXT,
       model TEXT,
       duration_minutes INTEGER
     );
@@ -285,6 +288,11 @@ if (usePostgres) {
   }
   try {
     db.exec('ALTER TABLE sessions ADD COLUMN entitlement_checked_at TEXT');
+  } catch (e) {
+    // Column already exists
+  }
+  try {
+    db.exec('ALTER TABLE sessions ADD COLUMN summary_error TEXT');
   } catch (e) {
     // Column already exists
   }

@@ -429,6 +429,7 @@ private struct SessionDTO: Codable {
     let endedAt: String?
     let loggingEnabledSnapshot: Bool?
     let summaryStatus: String?
+    let summaryError: String?
     let durationMinutes: Int?
 
     enum CodingKeys: String, CodingKey {
@@ -439,6 +440,7 @@ private struct SessionDTO: Codable {
         case endedAt = "ended_at"
         case loggingEnabledSnapshot = "logging_enabled_snapshot"
         case summaryStatus = "summary_status"
+        case summaryError = "summary_error"
         case durationMinutes = "duration_minutes"
     }
 
@@ -451,6 +453,7 @@ private struct SessionDTO: Codable {
             endedAt: parseDate(from: endedAt),
             loggingEnabledSnapshot: loggingEnabledSnapshot ?? false,
             summaryStatus: Session.SummaryStatus(rawValue: summaryStatus ?? "pending") ?? .pending,
+            summaryError: summaryError,
             durationMinutes: durationMinutes
         )
     }

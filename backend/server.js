@@ -167,9 +167,8 @@ async function generateSummaryAndTitle(sessionId) {
 
     if (!turns || turns.length === 0) {
       console.log(`⚠️  No turns found for session ${sessionId} - cannot generate summary`);
-      // Update status to 'failed' to prevent retries (matches SummaryStatus enum in Swift)
-      const updateStmt = db.prepare('UPDATE sessions SET summary_status = ? WHERE id = ?');
-      await updateStmt.run('failed', sessionId);
+      const updateStmt = db.prepare('UPDATE sessions SET summary_status = ?, summary_error = ? WHERE id = ?');
+      await updateStmt.run('failed', 'No transcript turns available for summarization', sessionId);
       return;
     }
 
@@ -240,7 +239,7 @@ async function generateSummaryAndTitle(sessionId) {
     );
 
     // Update session status to 'ready' - summary is now available
-    const updateStmt = db.prepare('UPDATE sessions SET summary_status = ? WHERE id = ?');
+    const updateStmt = db.prepare('UPDATE sessions SET summary_status = ?, summary_error = NULL WHERE id = ?');
     await updateStmt.run('ready', sessionId);
 
     console.log(`✅ Summary generated and saved for session ${sessionId}:`);
@@ -267,9 +266,13 @@ async function generateSummaryAndTitle(sessionId) {
       console.error(`   ⚠️  Model-related error - check if model name is correct`);
     }
 
-    // Mark as failed
-    const updateStmt = db.prepare('UPDATE sessions SET summary_status = ? WHERE id = ?');
-    await updateStmt.run('failed', sessionId);
+    const rawErrorMessage =
+      error?.response?.data?.error?.message ||
+      error?.message ||
+      'Unknown error generating summary';
+    const safeMessage = String(rawErrorMessage).slice(0, 500);
+    const updateStmt = db.prepare('UPDATE sessions SET summary_status = ?, summary_error = ? WHERE id = ?');
+    await updateStmt.run('failed', safeMessage, sessionId);
   }
 }
 
@@ -317,8 +320,34 @@ setInterval(() => processPendingSummaries('interval'), 30000);
 // Kick off processor at startup to handle any pending work immediately
 processPendingSummaries('startup');
 
+const deriveAppleUserId = (rawId) => {
+  return 'apple-' + crypto.createHash('sha256').update(rawId).digest('hex').slice(0, 32);
+};
+
+const migrateUserData = async (oldUserId, newUserId) => {
+  if (!oldUserId || !newUserId || oldUserId === newUserId) {
+    return;
+  }
+
+  try {
+    const updateSessions = db.prepare('UPDATE sessions SET user_id = ? WHERE user_id = ?');
+    const updateSubscriptions = db.prepare('UPDATE user_subscriptions SET user_id = ? WHERE user_id = ?');
+    const updateUsage = db.prepare('UPDATE monthly_usage SET user_id = ? WHERE user_id = ?');
+
+    const sessionResult = await updateSessions.run(newUserId, oldUserId);
+    await updateSubscriptions.run(newUserId, oldUserId);
+    await updateUsage.run(newUserId, oldUserId);
+
+    if (sessionResult?.changes) {
+      console.log(`🔄 Migrated ${sessionResult.changes} sessions from ${oldUserId} → ${newUserId}`);
+    }
+  } catch (error) {
+    console.error('❌ Failed to migrate user data:', error);
+  }
+};
+
 // Simple auth middleware (checks Bearer token exists)
-const authenticateToken = (req, res, next) => {
+const authenticateToken = async (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
@@ -338,9 +367,20 @@ const authenticateToken = (req, res, next) => {
 
   // Accept any token (device tokens start with "device_", JWT tokens are longer)
   // In production, you would validate JWT tokens properly
-  console.log(`✅ Auth token accepted: ${token.substring(0, 20)}...`);
-  req.userId = 'user-' + Buffer.from(token).toString('base64').slice(0, 10);
-  req.deviceId = token;
+  const derivedUserId = 'user-' + Buffer.from(token).toString('base64').slice(0, 10);
+  const sharedAppleId = req.headers['x-apple-user-id'];
+  if (sharedAppleId) {
+    req.appleUserIdRaw = sharedAppleId;
+    req.originalUserId = derivedUserId;
+    req.userId = deriveAppleUserId(sharedAppleId);
+    await migrateUserData(req.originalUserId, req.userId);
+  } else {
+    req.userId = derivedUserId;
+  }
+
+  const deviceHeader = req.headers['x-device-id'];
+  req.deviceId = deviceHeader || token;
+  console.log(`✅ Auth token accepted: ${token.substring(0, 20)}..., user: ${req.userId}, device: ${req.deviceId.substring(0, 12)}`);
   next();
 };
 
@@ -539,8 +579,8 @@ app.post('/v1/sessions/start', authenticateToken, async (req, res) => {
 
     // Store session in database
     const stmt = db.prepare(`
-      INSERT INTO sessions (id, user_id, context, started_at, logging_enabled_snapshot, summary_status, model, original_transaction_id, entitlement_checked_at)
-      VALUES (?, ?, ?, ?, ${usePostgres ? 'true' : '1'}, 'pending', ?, ?, ?)
+      INSERT INTO sessions (id, user_id, context, started_at, logging_enabled_snapshot, summary_status, summary_error, model, original_transaction_id, entitlement_checked_at)
+      VALUES (?, ?, ?, ?, ${usePostgres ? 'true' : '1'}, 'pending', NULL, ?, ?, ?)
     `);
     await stmt.run(
       sessionId,

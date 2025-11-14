@@ -13,6 +13,7 @@ struct Session: Identifiable, Codable {
     var endedAt: Date?
     let loggingEnabledSnapshot: Bool
     var summaryStatus: SummaryStatus
+    var summaryError: String?
     var durationMinutes: Int?
 
     enum SessionContext: String, Codable {
@@ -74,4 +75,3 @@ struct StartSessionResponse: Codable {
     let livekitToken: String
     let roomName: String
 }
-

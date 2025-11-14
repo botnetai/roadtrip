@@ -80,6 +80,7 @@ async function testSummary() {
       const statusSession = statusData.session || statusData;
       const statusSummary = statusData.summary;
       const status = statusSession.summaryStatus || statusSession.summary_status;
+      const summaryError = statusSession.summaryError || statusSession.summary_error;
 
       console.log(`   [${i + 1}/12] Status: ${status}`);
 
@@ -102,7 +103,11 @@ async function testSummary() {
       if (status === 'failed') {
         console.log('');
         console.error('❌ Summary generation failed');
-        console.error('   Check Railway logs for error details');
+        if (summaryError) {
+          console.error(`   Reason: ${summaryError}`);
+        } else {
+          console.error('   Check Railway logs for error details');
+        }
         return;
       }
     }

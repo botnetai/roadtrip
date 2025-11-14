@@ -53,8 +53,7 @@ struct SessionDetailScreen: View {
                     .padding()
                 } else {
                     if let session = session {
-                        SessionHeaderView(session: session, summaryTitle: summary?.title)
-                        SessionMetadataSection(session: session)
+                        SessionMetadataSection(session: session, summaryTitle: summary?.title)
                     }
 
                     if let summary = summary {
@@ -77,7 +76,7 @@ struct SessionDetailScreen: View {
                             }
                         )
                     } else if let session = session {
-                        ProcessingSummaryView(status: session.summaryStatus)
+                        ProcessingSummaryView(status: session.summaryStatus, errorMessage: session.summaryError)
                     }
                     
                     if !turns.isEmpty {
@@ -94,7 +93,7 @@ struct SessionDetailScreen: View {
             loadSessionDetails()
             HapticFeedbackService.shared.success()
         }
-        .navigationTitle(summary?.title ?? "Session")
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -402,44 +401,9 @@ struct SummarySection: View {
     }
 }
 
-struct SessionHeaderView: View {
-    let session: Session
-    let summaryTitle: String?
-
-    private var displayTitle: String {
-        if let summaryTitle = summaryTitle, !summaryTitle.isEmpty {
-            return summaryTitle
-        }
-
-        let suffix = session.id.split(separator: "-").last.map(String.init) ?? session.id
-        return "Session \(suffix.uppercased())"
-    }
-
-    private var formattedDate: String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .long
-        formatter.timeStyle = .short
-        return formatter.string(from: session.startedAt)
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(displayTitle)
-                .font(.title)
-                .fontWeight(.bold)
-                .accessibilityIdentifier("session_title")
-
-            Text("Recorded \(formattedDate)")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .accessibilityIdentifier("session_recorded_date")
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
 struct ProcessingSummaryView: View {
     let status: Session.SummaryStatus
+    let errorMessage: String?
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -460,6 +424,14 @@ struct ProcessingSummaryView: View {
                 Text("We couldn't generate a summary for this session. You can still review the transcript below.")
                     .font(.body)
                     .foregroundColor(.secondary)
+                if let errorMessage = errorMessage, !errorMessage.isEmpty {
+                    Text(errorMessage)
+                        .font(.footnote)
+                        .foregroundColor(.red)
+                        .padding(10)
+                        .background(Color.red.opacity(0.08))
+                        .cornerRadius(8)
+                }
             }
         }
         .padding()
@@ -471,8 +443,18 @@ struct ProcessingSummaryView: View {
 
 struct SessionMetadataSection: View {
     let session: Session
+    let summaryTitle: String?
+
+    private var displayTitle: String {
+        if let title = summaryTitle, !title.trimmingCharacters(in: .whitespaces).isEmpty {
+            return title
+        }
+
+        let suffix = session.id.split(separator: "-").last.map(String.init) ?? session.id
+        return "Session \(suffix.uppercased())"
+    }
     
-    private var formattedStartDate: String {
+    private var recordedDateText: String {
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
         formatter.timeStyle = .short
@@ -499,12 +481,21 @@ struct SessionMetadataSection: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Session Info")
-                    .font(.title2)
-                    .fontWeight(.bold)
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(displayTitle)
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                        .accessibilityIdentifier("session_title")
+                    Text("Recorded \(recordedDateText)")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .accessibilityIdentifier("session_recorded_date")
+                }
+
                 Spacer()
+
                 HStack(spacing: 4) {
                     if session.summaryStatus == .pending {
                         ProgressView()
@@ -528,10 +519,6 @@ struct SessionMetadataSection: View {
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                 
-                Label(formattedStartDate, systemImage: "clock")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                
                 if let endDate = formattedEndDate {
                     Label("Ended \(endDate)", systemImage: "stopwatch")
                         .font(.subheadline)
@@ -543,7 +530,6 @@ struct SessionMetadataSection: View {
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
-
             }
         }
         .padding()
