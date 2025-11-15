@@ -14,6 +14,12 @@ struct PaywallView: View {
     @State private var purchaseError: String?
     @State private var showError = false
 
+    private var weeklyBaselinePrice: Decimal? {
+        subscriptionManager.availableProducts
+            .first(where: { $0.id.lowercased().contains("week") })?
+            .weeklyPriceValue
+    }
+
     var body: some View {
         NavigationView {
             ScrollView {
@@ -56,6 +62,7 @@ struct PaywallView: View {
                                 ProductButton(
                                     product: product,
                                     isSelected: selectedProduct?.id == product.id,
+                                    weeklyBaselinePrice: weeklyBaselinePrice,
                                     onTap: {
                                         selectedProduct = product
                                         purchaseProduct(product)
@@ -174,32 +181,29 @@ struct FeatureRow: View {
 struct ProductButton: View {
     let product: Product
     let isSelected: Bool
+    let weeklyBaselinePrice: Decimal?
     let onTap: () -> Void
 
     private var savings: String? {
-        guard product.id.contains("year") else { return nil }
-        return "Save 20%"
+        guard
+            let baseline = weeklyBaselinePrice,
+            baseline > .zero,
+            let productWeeklyPrice = product.weeklyPriceValue,
+            productWeeklyPrice < baseline
+        else {
+            return nil
+        }
+
+        let savingsPercentage = ((baseline - productWeeklyPrice) / baseline) * 100
+        let percentageValue = NSDecimalNumber(decimal: savingsPercentage).doubleValue
+        let roundedPercentage = Int(percentageValue.rounded())
+
+        guard roundedPercentage >= 1 else { return nil }
+        return "Save \(roundedPercentage)%"
     }
 
     private var period: String {
-        if let unit = product.subscription?.subscriptionPeriod.unit {
-            switch unit {
-            case .week:
-                return "Weekly"
-            case .month:
-                return "Monthly"
-            case .year:
-                return "Yearly"
-            case .day:
-                return "Daily"
-            @unknown default:
-                break
-            }
-        }
-        if product.id.contains("week") { return "Weekly" }
-        if product.id.contains("month") { return "Monthly" }
-        if product.id.contains("year") { return "Yearly" }
-        return "Subscription"
+        product.paywallPeriodLabel
     }
 
     var body: some View {
@@ -245,4 +249,77 @@ struct ProductButton: View {
 
 #Preview {
     PaywallView()
+}
+
+private extension Product {
+    var paywallPeriodLabel: String {
+        let lowercasedId = id.lowercased()
+        if lowercasedId.contains("week") { return "Weekly" }
+        if lowercasedId.contains("month") { return "Monthly" }
+        if lowercasedId.contains("year") { return "Yearly" }
+
+        if let subscriptionInfo = subscription {
+            return subscriptionInfo.subscriptionPeriod.defaultLabel
+        }
+
+        return "Subscription"
+    }
+
+    var weeklyPriceValue: Decimal? {
+        guard let subscriptionInfo = subscription else {
+            return nil
+        }
+
+        let subscriptionPeriod = subscriptionInfo.subscriptionPeriod
+
+        guard
+            let weeks = subscriptionPeriod.approximateWeeks,
+            weeks > .zero
+        else {
+            return nil
+        }
+        return price / weeks
+    }
+}
+
+private extension Product.SubscriptionPeriod {
+    var defaultLabel: String {
+        switch unit {
+        case .day:
+            if value == 1 { return "Daily" }
+            if value % 7 == 0 {
+                let weeks = value / 7
+                return weeks == 1 ? "Weekly" : "\(weeks)-Week"
+            }
+            return "\(value)-Day"
+        case .week:
+            return value == 1 ? "Weekly" : "\(value)-Week"
+        case .month:
+            return value == 1 ? "Monthly" : "\(value)-Month"
+        case .year:
+            return value == 1 ? "Yearly" : "\(value)-Year"
+        @unknown default:
+            return "Subscription"
+        }
+    }
+
+    var approximateWeeks: Decimal? {
+        switch unit {
+        case .day:
+            return Decimal(value) / Decimal(7)
+        case .week:
+            return Decimal(value)
+        case .month:
+            return Decimal(value) * PaywallPeriodMath.weeksPerMonth
+        case .year:
+            return Decimal(value) * PaywallPeriodMath.weeksPerYear
+        @unknown default:
+            return nil
+        }
+    }
+}
+
+private enum PaywallPeriodMath {
+    static let weeksPerYear = Decimal(52)
+    static let weeksPerMonth = weeksPerYear / Decimal(12)
 }

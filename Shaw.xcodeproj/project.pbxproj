@@ -14,6 +14,7 @@
 		37A2552CD8F5FECEAF8CFE8C /* SessionLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 750AD0E191A00BF314925834 /* SessionLogger.swift */; };
 		3AF7500883614872B893F60F /* VoiceModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78DC8E30FF4444B1B6907FD4 /* VoiceModels.swift */; };
 		4842ACCA0B0D43E4989ABC29 /* VoicePreviewService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ACA884917C34E0C8DEDA8FD /* VoicePreviewService.swift */; };
+		E2B4F6D1C1A04EBD9A2B3C4E /* MicrophoneLevelMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2B4F6D1C1A04EBD9A2B3C4D /* MicrophoneLevelMonitor.swift */; };
 		610FF6E03DEB7DEBB6E8FB0B /* SettingsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A79AD2CD15C369F5E45DDE03 /* SettingsScreen.swift */; };
 		6C58F99A69ECED8053CC2CBF /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9AEA20E2FF6F23D5382061B /* AuthService.swift */; };
 		845B4F43C53ADB1782DD323B /* SessionDetailScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FB9C43A548091AD05A0CE38 /* SessionDetailScreen.swift */; };
@@ -51,6 +52,7 @@
 		A1B2C3D4E5F6A7B8C9D0E1F2 /* HapticFeedbackService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F6A7B8C9D0E1F2A3 /* HapticFeedbackService.swift */; };
 		C3D4E5F6A7B8C9D0E1F2A3B4 /* TimeFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E5F6A7B8C9D0E1F2A3B4C5 /* TimeFormatter.swift */; };
 		D6AEBBFBAA7C4BA88E7394B9 /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F17B3090761A4B06AEFC756F /* PaywallView.swift */; };
+		E1B2C3D4E5F6A7B8C9D0E1F1 /* SignInScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1B2C3D4E5F6A7B8C9D0E1F0 /* SignInScreen.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -98,6 +100,7 @@
 		9675F68966B06ED84429C11C /* LiveKitService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveKitService.swift; sourceTree = "<group>"; };
 		9A6D2EE242DA425281900EEA /* HybridSessionLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HybridSessionLogger.swift; sourceTree = "<group>"; };
 		9ACA884917C34E0C8DEDA8FD /* VoicePreviewService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoicePreviewService.swift; sourceTree = "<group>"; };
+		E2B4F6D1C1A04EBD9A2B3C4D /* MicrophoneLevelMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicrophoneLevelMonitor.swift; sourceTree = "<group>"; };
 		A14066993B218B00EAB9281D /* CallKitProtocols.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallKitProtocols.swift; sourceTree = "<group>"; };
 		A3D8E9F7C5B4A2E8D9F1C6E7 /* MockCallKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockCallKit.swift; sourceTree = "<group>"; };
 		A79AD2CD15C369F5E45DDE03 /* SettingsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsScreen.swift; sourceTree = "<group>"; };
@@ -120,6 +123,7 @@
 		B2C3D4E5F6A7B8C9D0E1F2A3 /* HapticFeedbackService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HapticFeedbackService.swift; sourceTree = "<group>"; };
 		D4E5F6A7B8C9D0E1F2A3B4C5 /* TimeFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeFormatter.swift; sourceTree = "<group>"; };
 		F17B3090761A4B06AEFC756F /* PaywallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
+		E1B2C3D4E5F6A7B8C9D0E1F0 /* SignInScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInScreen.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -170,6 +174,7 @@
 				A9AEA20E2FF6F23D5382061B /* AuthService.swift */,
 				955C4F1C4DA930C652EC715E /* Configuration.swift */,
 				9ACA884917C34E0C8DEDA8FD /* VoicePreviewService.swift */,
+				E2B4F6D1C1A04EBD9A2B3C4D /* MicrophoneLevelMonitor.swift */,
 				829B55CB659A4D1EB73FFBE6 /* SubscriptionManager.swift */,
 				49F0AD0C7FEA4A1C9C5B804C /* EntitlementsCache.swift */,
 				E7E3CCB8B87D473BAEDB0C38 /* IAPAPI.swift */,
@@ -189,6 +194,7 @@
 				A79AD2CD15C369F5E45DDE03 /* SettingsScreen.swift */,
 				DE765871A2DC4733B411C8CB /* CallScreen.swift */,
 				F17B3090761A4B06AEFC756F /* PaywallView.swift */,
+				E1B2C3D4E5F6A7B8C9D0E1F0 /* SignInScreen.swift */,
 			);
 			path = Screens;
 			sourceTree = "<group>";
@@ -451,6 +457,7 @@
 				8ACAA9DD5F346B0A84B2425C /* AssistantCallCoordinator.swift in Sources */,
 				214BE7CF0C7B4A119FEB7999 /* CallScreen.swift in Sources */,
 				4842ACCA0B0D43E4989ABC29 /* VoicePreviewService.swift in Sources */,
+				E2B4F6D1C1A04EBD9A2B3C4E /* MicrophoneLevelMonitor.swift in Sources */,
 				3AF7500883614872B893F60F /* VoiceModels.swift in Sources */,
 				C2FC9EF0EBF6452690F587BF /* SubscriptionState.swift in Sources */,
 				7EC82C708D8F430B9BA81C05 /* SubscriptionManager.swift in Sources */,
@@ -459,6 +466,7 @@
 				A1B2C3D4E5F6A7B8C9D0E1F2 /* HapticFeedbackService.swift in Sources */,
 				C3D4E5F6A7B8C9D0E1F2A3B4 /* TimeFormatter.swift in Sources */,
 				D6AEBBFBAA7C4BA88E7394B9 /* PaywallView.swift in Sources */,
+				E1B2C3D4E5F6A7B8C9D0E1F1 /* SignInScreen.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

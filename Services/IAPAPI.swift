@@ -25,9 +25,7 @@ class IAPAPI {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-        if let token = authService.authToken {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
+        authService.applyAuthHeaders(to: &request)
 
         let body = VerifyRequest(
             transactionJWS: transactionJWS,

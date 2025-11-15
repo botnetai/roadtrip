@@ -54,6 +54,8 @@ final class LiveKitService: @unchecked Sendable {
                 if let liveKitError = error as? LiveKitError {
                     print("❌ LiveKit error type: \(liveKitError)")
                 }
+                self.room = nil
+                self.isConnected = false
                 self.delegate?.liveKitServiceDidFail(error: error)
             }
         }

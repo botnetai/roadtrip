@@ -85,16 +85,7 @@ class HybridSessionLogger: ObservableObject {
             if await cloudKit.isICloudAvailable() {
                 let cloudKitSessions = try await cloudKit.fetchSessions()
                 // Convert Session to SessionListItem
-                sessions = cloudKitSessions.map { session in
-                    SessionListItem(
-                        id: session.id,
-                        title: "Session", // Title will come from summary
-                        summarySnippet: session.context.rawValue.capitalized,
-                        startedAt: session.startedAt,
-                        endedAt: session.endedAt,
-                        context: session.context
-                    )
-                }
+                sessions = cloudKitSessions.map { SessionListItem.from(session: $0) }
             } else {
                 // Fallback to backend
                 sessions = try await backend.fetchSessions()
@@ -179,4 +170,5 @@ class HybridSessionLogger: ObservableObject {
             return "iCloud unavailable - using backend only"
         }
     }
+
 }

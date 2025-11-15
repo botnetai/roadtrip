@@ -17,9 +17,15 @@ enum CallState {
 class AssistantCallCoordinator: ObservableObject {
     static let shared = AssistantCallCoordinator()
 
-    @Published var callState: CallState = .idle
+    @Published var callState: CallState = .idle {
+        didSet {
+            handleCallStateChange(from: oldValue, to: callState)
+        }
+    }
     @Published var currentSessionID: String?
     @Published var errorMessage: String?
+    @Published var showConnectingOverlay = false
+    @Published var overlayIsDisconnecting = false
 
     private let callManager = CallManager.shared
     private let liveKitService = LiveKitService.shared
@@ -39,6 +45,11 @@ class AssistantCallCoordinator: ObservableObject {
     private var maxDurationTimer: Timer?
     private var lastActivityTime: Date?
 
+    // Connecting overlay timing control
+    private var overlayShownAt: Date?
+    private var overlayHideTask: Task<Void, Never>?
+    private let minimumOverlayDisplay: TimeInterval = 1.5
+
     // Constants
     private let inactivityTimeout: TimeInterval = 5 * 60  // 5 minutes
     private let maxCallDuration: TimeInterval = 60 * 60   // 1 hour
@@ -46,6 +57,62 @@ class AssistantCallCoordinator: ObservableObject {
     private init() {
         callManager.delegate = self
         liveKitService.delegate = self
+    }
+
+    private func handleCallStateChange(from oldValue: CallState, to newValue: CallState) {
+        switch newValue {
+        case .connecting:
+            startOverlay(isDisconnecting: false)
+        case .disconnecting:
+            startOverlay(isDisconnecting: true)
+        case .connected, .idle:
+            scheduleOverlayHideIfNeeded()
+        }
+    }
+
+    private func startOverlay(isDisconnecting: Bool) {
+        overlayHideTask?.cancel()
+        overlayIsDisconnecting = isDisconnecting
+        overlayShownAt = Date()
+        if !showConnectingOverlay {
+            showConnectingOverlay = true
+        }
+    }
+
+    private func scheduleOverlayHideIfNeeded() {
+        guard showConnectingOverlay else { return }
+
+        let elapsed = Date().timeIntervalSince(overlayShownAt ?? Date())
+        let delay = max(0, minimumOverlayDisplay - elapsed)
+
+        overlayHideTask?.cancel()
+        overlayHideTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            if delay > 0 {
+                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            }
+
+            // If state flipped back to a connecting lifecycle, keep overlay up
+            if self.callState == .connecting || self.callState == .disconnecting {
+                return
+            }
+
+            self.showConnectingOverlay = false
+            self.overlayIsDisconnecting = false
+            self.overlayShownAt = nil
+        }
+    }
+
+    private func resetAfterFailedStart(errorDescription: String?) {
+        stopTimers()
+        currentSessionID = nil
+        pendingContext = nil
+        callStartTime = nil
+        lastActivityTime = nil
+        if let errorDescription {
+            errorMessage = errorDescription
+        }
+        callState = .idle
     }
     
     func startAssistantCall(context: String, enableLogging: Bool) {
@@ -228,16 +295,26 @@ extension AssistantCallCoordinator: CallManagerDelegate {
 
     nonisolated func callManagerDidDisconnect() {
         Task { @MainActor in
-            endAssistantCall()
+            // If CallKit ends before we've fully connected, treat it as a failed start rather than a normal hangup
+            if self.callState == .connecting && self.currentSessionID == nil {
+                print("ℹ️ CallKit disconnected before session established; continuing connection flow.")
+                return
+            }
+
+            let shouldNavigate = self.callState == .disconnecting
+            endAssistantCall(navigateToSession: shouldNavigate)
         }
     }
 
     nonisolated func callManagerDidFail(error: Error) {
         Task { @MainActor in
-            callState = .idle
-            pendingContext = nil
-            errorMessage = "Call failed: \(error.localizedDescription)"
             print("Call failed: \(error)")
+            if self.callState == .connecting {
+                resetAfterFailedStart(errorDescription: "Call failed: \(error.localizedDescription)")
+            } else {
+                errorMessage = "Call failed: \(error.localizedDescription)"
+                endAssistantCall(navigateToSession: false)
+            }
         }
     }
 }
@@ -245,6 +322,7 @@ extension AssistantCallCoordinator: CallManagerDelegate {
 extension AssistantCallCoordinator: LiveKitServiceDelegate {
     func liveKitServiceDidConnect() {
         callState = .connected
+        callManager.reportCallConnected()
     }
 
     func liveKitServiceDidDisconnect() {
@@ -257,8 +335,12 @@ extension AssistantCallCoordinator: LiveKitServiceDelegate {
         print("❌ LiveKit service failed with error: \(error)")
         print("❌ Error type: \(type(of: error))")
         print("❌ Error description: \(error.localizedDescription)")
-        errorMessage = "Connection failed: \(error.localizedDescription)"
-        endAssistantCall(navigateToSession: false)
+        if callState == .connecting {
+            resetAfterFailedStart(errorDescription: "Connection failed: \(error.localizedDescription)")
+        } else {
+            errorMessage = "Connection failed: \(error.localizedDescription)"
+            endAssistantCall(navigateToSession: false)
+        }
     }
 
     func liveKitServiceDidDetectActivity() {

@@ -177,9 +177,9 @@ async function generateSummaryAndTitle(sessionId) {
     // Format transcript
     const transcript = turns.map(t => `${t.speaker}: ${t.text}`).join('\n');
 
-    // Generate summary using GPT-4o Mini via OpenAI API
+    // Generate summary using GPT-5.1 Nano via OpenAI API
     const summaryResponse = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: 'gpt-5.1-nano',
       messages: [
         {
           role: 'system',
@@ -195,13 +195,13 @@ async function generateSummaryAndTitle(sessionId) {
 
     const summaryText = summaryResponse.choices[0]?.message?.content?.trim();
     if (!summaryText) {
-      console.error('❌ GPT-4o Mini returned empty summary text:', JSON.stringify(summaryResponse, null, 2));
-      throw new Error('GPT-4o Mini returned empty summary text');
+      console.error('❌ GPT-5.1 Nano returned empty summary text:', JSON.stringify(summaryResponse, null, 2));
+      throw new Error('GPT-5.1 Nano returned empty summary text');
     }
 
     // Generate title based on the completed summary for consistency
     const titleResponse = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: 'gpt-5.1-nano',
       messages: [
         {
           role: 'system',
@@ -395,6 +395,7 @@ app.get('/health/agent', async (req, res) => {
   const agentConfigured = !!(process.env.LIVEKIT_API_KEY &&
                               process.env.LIVEKIT_API_SECRET &&
                               process.env.LIVEKIT_URL);
+  const perplexityConfigured = !!process.env.PERPLEXITY_API_KEY;
 
   let agentStatus = 'unknown';
   let lastRoomActivity = null;
@@ -460,6 +461,7 @@ app.get('/health/agent', async (req, res) => {
 
   res.json({
     agent_configured: agentConfigured,
+    perplexity_configured: perplexityConfigured,
     agent_status: agentStatus,
     livekit_url: process.env.LIVEKIT_URL || null,
     last_room_activity: lastRoomActivity,
@@ -524,14 +526,17 @@ app.post('/v1/sessions/start', authenticateToken, async (req, res) => {
       }
     }
 
+    const normalizedToolCalling = tool_calling_enabled === undefined ? true : normalizeBoolean(tool_calling_enabled);
+    const normalizedWebSearch = web_search_enabled === undefined ? true : normalizeBoolean(web_search_enabled);
+
     // Validate model if provided (optional) - only for hybrid mode (non-realtime)
     // Models use LiveKit Inference provider/model format
     // See: https://docs.livekit.io/agents/models/#inference
     const validModels = [
       // OpenAI models available through LiveKit Inference
-      'openai/gpt-4o',
-      'openai/gpt-4o-mini',
-      'openai/gpt-4.1-mini',
+      'openai/gpt-5.1',
+      'openai/gpt-5.1-mini',
+      'openai/gpt-5.1-nano',
       // Anthropic models available through LiveKit Inference
       'claude-sonnet-4-5',
       'claude-haiku-4-5',
@@ -545,13 +550,26 @@ app.post('/v1/sessions/start', authenticateToken, async (req, res) => {
 
     // Pro-only models require active subscription
     const proOnlyModels = [
-      'openai/gpt-4o',
+      'openai/gpt-5.1',
       'claude-sonnet-4-5',
       'google/gemini-2.5-pro',
       'xai/grok-4'
     ];
 
-    const selectedModel = useRealtimeMode ? null : (model && validModels.includes(model) ? model : 'openai/gpt-4o-mini');
+    let selectedModel = useRealtimeMode ? null : (model && validModels.includes(model) ? model : 'openai/gpt-5.1-nano');
+    let modelSubstitution = null;
+
+    if (!useRealtimeMode && normalizedToolCalling) {
+      const toolCapableModels = ['openai/gpt-5.1', 'openai/gpt-5.1-mini', 'openai/gpt-5.1-nano'];
+      if (!toolCapableModels.includes(selectedModel)) {
+        console.warn(`⚠️  Tool calling requested but model ${selectedModel} is not in the tool-capable allowlist. Falling back to openai/gpt-5.1-nano.`);
+        modelSubstitution = {
+          requested: selectedModel,
+          substituted: 'openai/gpt-5.1-nano'
+        };
+        selectedModel = 'openai/gpt-5.1-nano';
+      }
+    }
 
     // Check if user is trying to use a Pro-only model without Pro subscription
     if (selectedModel && proOnlyModels.includes(selectedModel)) {
@@ -559,15 +577,12 @@ app.post('/v1/sessions/start', authenticateToken, async (req, res) => {
       if (!hasPro) {
         return res.status(403).json({
           error: 'PRO_REQUIRED',
-          message: 'Shaw Pro is required to use this model. Please switch to GPT-4o Mini or another non-Pro option.',
+          message: 'Shaw Pro is required to use this model. Please switch to GPT-5.1 Nano or another non-Pro option.',
           model: selectedModel,
-          suggested_model: 'openai/gpt-4o-mini'
+          suggested_model: 'openai/gpt-5.1-nano'
         });
       }
     }
-
-    const normalizedToolCalling = tool_calling_enabled === undefined ? true : normalizeBoolean(tool_calling_enabled);
-    const normalizedWebSearch = web_search_enabled === undefined ? true : normalizeBoolean(web_search_enabled);
 
     const sessionId = `session-${crypto.randomUUID()}`;
     const roomName = generateRoomName();
@@ -639,9 +654,10 @@ app.post('/v1/sessions/start', authenticateToken, async (req, res) => {
       livekit_token: livekitToken,
       room_name: roomName,
       mode: useRealtimeMode ? 'realtime' : 'hybrid',
-      model: selectedModel || (useRealtimeMode ? 'openai-realtime' : 'openai/gpt-4o-mini'),
+      model: selectedModel || (useRealtimeMode ? 'openai-realtime' : 'openai/gpt-5.1-nano'),
       voice: selectedVoice,
-      language: normalizedLanguage
+      language: normalizedLanguage,
+      model_substitution: modelSubstitution
     });
   } catch (error) {
     console.error('Start session error:', error);

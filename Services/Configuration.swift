@@ -5,12 +5,12 @@
 
 import Foundation
 
-enum Environment {
+enum AppEnvironment {
     case development
     case staging
     case production
 
-    static var current: Environment {
+    static var current: AppEnvironment {
         #if DEBUG
         return .development
         #else
@@ -25,7 +25,7 @@ struct Configuration {
     private init() {}
 
     var apiBaseURL: String {
-        switch Environment.current {
+        switch AppEnvironment.current {
         case .development:
             return ProcessInfo.processInfo.environment["API_BASE_URL"] ?? "https://shaw.up.railway.app/v1"
         case .staging:
@@ -44,7 +44,7 @@ struct Configuration {
     }
 
     var isLoggingEnabled: Bool {
-        switch Environment.current {
+        switch AppEnvironment.current {
         case .development:
             return true
         case .staging:
@@ -59,7 +59,7 @@ struct Configuration {
         ================================================
         AI Voice Copilot Configuration
         ================================================
-        Environment: \(Environment.current)
+        Environment: \(AppEnvironment.current)
         API Base URL: \(apiBaseURL)
         Auth Login URL: \(authLoginURL)
         Logging Enabled: \(isLoggingEnabled)

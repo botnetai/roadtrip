@@ -49,14 +49,11 @@ class SessionLogger {
         request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-        // Add authentication token if available
-        if let token = authService.authToken {
-            print("📡 Adding auth token to request: \(token.prefix(20))...")
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        } else {
+        if authService.authToken == nil {
             print("❌ No auth token available for request!")
         }
 
+        authService.applyAuthHeaders(to: &request)
         return request
     }
     
@@ -72,6 +69,7 @@ class SessionLogger {
         if httpResponse.statusCode == 401 {
             let errorMessage = String(data: data, encoding: .utf8) ?? "No error message"
             print("❌ 401 Unauthorized - \(errorMessage)")
+            authService.logout(reason: "Authentication expired. Please sign in with Apple again.")
             throw SessionLoggerError.unauthorized
         }
 
@@ -396,7 +394,7 @@ enum SessionLoggerError: LocalizedError {
             return "Server error (\(statusCode)): \(message)"
         case .proModelRestricted(let model, let suggested):
             let modelName = model.flatMap { AIModel(rawValue: $0)?.displayName } ?? "This model"
-            let fallback = suggested.flatMap { AIModel(rawValue: $0)?.displayName } ?? AIModel.gpt4oMini.displayName
+            let fallback = suggested.flatMap { AIModel(rawValue: $0)?.displayName } ?? AIModel.gpt51Nano.displayName
             return "\(modelName) requires Shaw Pro. Switch to \(fallback) or another non-Pro model in Settings → AI Model."
         }
     }
@@ -431,6 +429,9 @@ private struct SessionDTO: Codable {
     let summaryStatus: String?
     let summaryError: String?
     let durationMinutes: Int?
+    let summaryTitle: String?
+    let summarySnippet: String?
+    let summaryText: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -442,6 +443,9 @@ private struct SessionDTO: Codable {
         case summaryStatus = "summary_status"
         case summaryError = "summary_error"
         case durationMinutes = "duration_minutes"
+        case summaryTitle = "summary_title"
+        case summarySnippet = "summary_snippet"
+        case summaryText = "summary_text"
     }
 
     func toModel() -> Session {
@@ -454,6 +458,9 @@ private struct SessionDTO: Codable {
             loggingEnabledSnapshot: loggingEnabledSnapshot ?? false,
             summaryStatus: Session.SummaryStatus(rawValue: summaryStatus ?? "pending") ?? .pending,
             summaryError: summaryError,
+            summaryTitle: summaryTitle,
+            summarySnippet: summarySnippet,
+            summaryText: summaryText,
             durationMinutes: durationMinutes
         )
     }

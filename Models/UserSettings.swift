@@ -12,6 +12,12 @@ class UserSettings: ObservableObject {
         }
     }
 
+    @Published var isSignedIn: Bool {
+        didSet {
+            UserDefaults.standard.set(isSignedIn, forKey: "isSignedIn")
+        }
+    }
+
     @Published var retentionDays: Int {
         didSet {
             UserDefaults.standard.set(retentionDays, forKey: "retentionDays")
@@ -76,6 +82,12 @@ class UserSettings: ObservableObject {
 
     private init() {
         self.loggingEnabled = UserDefaults.standard.bool(forKey: "loggingEnabled")
+        
+        if UserDefaults.standard.object(forKey: "isSignedIn") != nil {
+            self.isSignedIn = UserDefaults.standard.bool(forKey: "isSignedIn")
+        } else {
+            self.isSignedIn = AuthService.shared.appleUserID != nil
+        }
 
         // Check if retentionDays key exists to distinguish between "not set" (default to 30) and "set to 0" (never delete)
         if UserDefaults.standard.object(forKey: "retentionDays") != nil {
@@ -89,9 +101,13 @@ class UserSettings: ObservableObject {
         // Load selected model
         if let data = UserDefaults.standard.data(forKey: "selectedModel"),
            let model = try? JSONDecoder().decode(AIModel.self, from: data) {
-            self.selectedModel = model
+            if model == .gpt51Mini {
+                self.selectedModel = .gpt51Nano
+            } else {
+                self.selectedModel = model
+            }
         } else {
-            self.selectedModel = .gpt4oMini
+            self.selectedModel = .gpt51Nano
         }
 
         let storedLanguage = UserDefaults.standard.string(forKey: "selectedLanguage")

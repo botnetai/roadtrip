@@ -101,6 +101,10 @@ class CloudKitSyncService: ObservableObject {
         record["loggingEnabledSnapshot"] = session.loggingEnabledSnapshot as CKRecordValue
         record["summaryStatus"] = session.summaryStatus.rawValue as CKRecordValue
         record["durationMinutes"] = session.durationMinutes as CKRecordValue?
+        record["summaryError"] = session.summaryError as CKRecordValue?
+        record["summaryTitle"] = session.summaryTitle as CKRecordValue?
+        record["summarySnippet"] = session.summarySnippet as CKRecordValue?
+        record["summaryText"] = session.summaryText as CKRecordValue?
 
         return record
     }
@@ -118,6 +122,10 @@ class CloudKitSyncService: ObservableObject {
 
         let endedAt = record["endedAt"] as? Date
         let durationMinutes = record["durationMinutes"] as? Int
+        let summaryError = record["summaryError"] as? String
+        let summaryTitle = record["summaryTitle"] as? String
+        let summarySnippet = record["summarySnippet"] as? String
+        let summaryText = record["summaryText"] as? String
 
         return Session(
             id: record.recordID.recordName,
@@ -127,6 +135,10 @@ class CloudKitSyncService: ObservableObject {
             endedAt: endedAt,
             loggingEnabledSnapshot: loggingEnabledSnapshot,
             summaryStatus: summaryStatus,
+            summaryError: summaryError,
+            summaryTitle: summaryTitle,
+            summarySnippet: summarySnippet,
+            summaryText: summaryText,
             durationMinutes: durationMinutes
         )
     }

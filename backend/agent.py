@@ -44,8 +44,10 @@ def verify_env():
     logger.info(f"   LIVEKIT_API_KEY: {os.getenv('LIVEKIT_API_KEY')[:6]}...")
     cartesia = os.getenv('CARTESIA_API_KEY')
     eleven = os.getenv('ELEVENLABS_API_KEY')
+    perplexity = os.getenv('PERPLEXITY_API_KEY')
     logger.info(f"   CARTESIA_API_KEY: {cartesia[:6] + '...' if cartesia else 'not set'}")
     logger.info(f"   ELEVENLABS_API_KEY: {eleven[:6] + '...' if eleven else 'not set'}")
+    logger.info(f"   PERPLEXITY_API_KEY: {perplexity[:6] + '...' if perplexity else 'not set'}")
     return True
 
 # Backend API configuration
@@ -238,7 +240,12 @@ class Assistant(Agent):
         )
 
         # Store settings
+        self._tool_calling_enabled = tool_calling_enabled
         self._web_search_enabled = web_search_enabled
+
+        # If tool calling is disabled, drop all tools so the LLM cannot discover them
+        if not tool_calling_enabled:
+            self._tools = []
 
     @function_tool()
     async def web_search(
@@ -413,7 +420,7 @@ async def entrypoint(ctx: agents.JobContext):
 
     realtime_mode = metadata.get('realtime', False)  # Backend sends true for full Realtime, false for hybrid
     voice = metadata.get('voice', 'cartesia/sonic-3:9626c31c-bec5-4cca-baa8-f8ba9e84c8bc')
-    model = metadata.get('model', 'openai/gpt-4o-mini')
+    model = metadata.get('model', 'openai/gpt-5.1-nano')
     tool_calling_enabled = metadata.get('tool_calling_enabled', True)
     web_search_enabled = metadata.get('web_search_enabled', True)
     language = metadata.get('language', 'en-US')
@@ -425,7 +432,24 @@ async def entrypoint(ctx: agents.JobContext):
 
     logger.info(f"🔧 Tool settings - Tool calling: {tool_calling_enabled}, Web search: {web_search_enabled}")
     logger.info(f"🌐 STT language: {language} ({language_label})")
+    if tool_calling_enabled and web_search_enabled and not os.getenv('PERPLEXITY_API_KEY'):
+        logger.warning("⚠️  web_search tool enabled but PERPLEXITY_API_KEY is missing - tool calls will fail")
     transcript_manager = TranscriptManager(session_id)
+
+    tool_choice = None if tool_calling_enabled else "none"
+
+    def attach_tool_logging(agent_session: AgentSession) -> None:
+        @agent_session.on("function_tools_executed")
+        def on_function_tools_executed(event):
+            try:
+                calls = getattr(event, "function_calls", []) or []
+                outputs = getattr(event, "function_call_outputs", []) or []
+                names = [c.name for c in calls]
+                logger.info(f"🛠️ Tool calls executed: {', '.join(names) if names else 'none'}")
+                if outputs and any(out is None for out in outputs):
+                    logger.warning("⚠️  One or more tool calls returned no output")
+            except Exception as e:
+                logger.error(f"❌ Failed to log tool execution event: {e}")
 
     try:
         if realtime_mode:
@@ -478,18 +502,24 @@ async def entrypoint(ctx: agents.JobContext):
             room_input_options = RoomInputOptions(close_on_disconnect=False)
             logger.info("🎤 Starting full Realtime agent session...")
             logger.info("   RoomIO will automatically subscribe to audio tracks")
-            
+
+            assistant_agent = Assistant(
+                tool_calling_enabled=tool_calling_enabled,
+                web_search_enabled=web_search_enabled,
+                preferred_language_name=language_label,
+                stt_model="deepgram/nova-3",
+                stt_language=language,
+            )
+            attach_tool_logging(agent_session)
+
             await agent_session.start(
                 room=ctx.room,
-                agent=Assistant(
-                    tool_calling_enabled=tool_calling_enabled,
-                    web_search_enabled=web_search_enabled,
-                    preferred_language_name=language_label,
-                    stt_model="deepgram/nova-3",
-                    stt_language=language,
-                ),
+                agent=assistant_agent,
                 room_input_options=room_input_options,
             )
+
+            if tool_choice == "none" and agent_session._activity:
+                agent_session._activity.update_options(tool_choice="none")
             
             # Now that we're connected, log participants and tracks
             logger.info("✅ Agent session started - room connected")
@@ -501,7 +531,8 @@ async def entrypoint(ctx: agents.JobContext):
                     logger.info(f"     Track: {track_pub.name} ({track_pub.kind}) - subscribed: {track_pub.subscribed}")
 
             await agent_session.generate_reply(
-                instructions=f"Greet the driver briefly in {language_label} and ask how you can help them."
+                instructions=f"Greet the driver briefly in {language_label} and ask how you can help them.",
+                tool_choice=tool_choice,
             )
 
             logger.info("✅ Full Realtime agent session started successfully")
@@ -512,9 +543,9 @@ async def entrypoint(ctx: agents.JobContext):
             logger.info(f"📢 TTS voice: {voice}")
 
             # Use LiveKit Inference for LLM (not OpenAI Realtime)
-            # Model format: "openai/gpt-4o", "openai/gpt-4o-mini", etc.
+            # Model format: "openai/gpt-5.1", "openai/gpt-5.1-mini", etc.
             # LiveKit Inference handles the connection automatically
-            llm_model = model or "openai/gpt-4o-mini"
+            llm_model = model or "openai/gpt-5.1-nano"
 
             # Create TTS instance - use plugin if available (bypasses LiveKit Inference TTS limit)
             # Otherwise fall back to LiveKit Inference
@@ -562,18 +593,24 @@ async def entrypoint(ctx: agents.JobContext):
             room_input_options = RoomInputOptions(close_on_disconnect=False)
             logger.info("🎤 Starting hybrid agent session...")
             logger.info("   RoomIO will automatically subscribe to audio tracks")
-            
+
+            assistant_agent = Assistant(
+                tool_calling_enabled=tool_calling_enabled,
+                web_search_enabled=web_search_enabled,
+                preferred_language_name=language_label,
+                stt_model="deepgram/nova-3",
+                stt_language=language,
+            )
+            attach_tool_logging(agent_session)
+
             await agent_session.start(
                 room=ctx.room,
-                agent=Assistant(
-                    tool_calling_enabled=tool_calling_enabled,
-                    web_search_enabled=web_search_enabled,
-                    preferred_language_name=language_label,
-                    stt_model="deepgram/nova-3",
-                    stt_language=language,
-                ),
+                agent=assistant_agent,
                 room_input_options=room_input_options,
             )
+
+            if tool_choice == "none" and agent_session._activity:
+                agent_session._activity.update_options(tool_choice="none")
             
             # Now that we're connected, log participants and tracks
             logger.info("✅ Hybrid agent session started - room connected")
@@ -585,7 +622,8 @@ async def entrypoint(ctx: agents.JobContext):
                     logger.info(f"     Track: {track_pub.name} ({track_pub.kind}) - subscribed: {track_pub.subscribed}")
 
             await agent_session.generate_reply(
-                instructions=f"Greet the driver briefly in {language_label} and ask how you can help them."
+                instructions=f"Greet the driver briefly in {language_label} and ask how you can help them.",
+                tool_choice=tool_choice,
             )
 
             logger.info("✅ Hybrid agent session started successfully")

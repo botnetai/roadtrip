@@ -72,6 +72,11 @@ class CallManager: NSObject {
             }
         }
     }
+
+    func reportCallConnected() {
+        guard let uuid = currentCallUUID else { return }
+        provider.reportOutgoingCall(with: uuid, connectedAt: Date())
+    }
     
     func endCurrentCall() {
         guard let callUUID = currentCallUUID else { return }
@@ -122,6 +127,7 @@ class CallManager: NSObject {
 extension CallManager: CXProviderDelegate {
     func provider(_ provider: CXProvider, perform action: CXStartCallAction) {
         configureAudioSession()
+        provider.reportOutgoingCall(with: action.callUUID, startedConnectingAt: Date())
         action.fulfill()
         delegate?.callManagerDidConnect()
     }

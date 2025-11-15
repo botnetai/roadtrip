@@ -102,8 +102,11 @@ struct CallScreen: View {
                         }
                     }
                 } else if callCoordinator.callState == .connected {
-                    VStack(spacing: 16) {
+                    VStack(spacing: 24) {
                         Spacer()
+
+                        MicrophoneActivityView()
+                            .padding(.horizontal, 24)
 
                         StatusIndicatorView(
                             isLoggingEnabled: selectedLoggingOption == .enabled
@@ -131,10 +134,6 @@ struct CallScreen: View {
                     .padding(.bottom, 32)
             }
             
-            if callCoordinator.callState == .connecting || callCoordinator.callState == .disconnecting {
-                ConnectingOverlayView(isDisconnecting: callCoordinator.callState == .disconnecting)
-                    .transition(.opacity)
-            }
         }
         .navigationTitle("Call")
         .navigationBarTitleDisplayMode(.large)
@@ -143,7 +142,7 @@ struct CallScreen: View {
                 selectedLoggingOption = settings.loggingEnabled ? .enabled : .disabled
             }
             if !subscriptionManager.state.isActive && settings.selectedModel.requiresPro {
-                settings.selectedModel = .gpt4oMini
+                settings.selectedModel = .gpt51Nano
             }
         }
         .alert("Error", isPresented: $showErrorAlert) {
@@ -166,6 +165,94 @@ struct CallScreen: View {
         )
     }
     
+}
+
+struct ModelRowView: View {
+    let title: String
+    let description: String
+    let showProBadge: Bool
+    let isSelected: Bool
+
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Text(title)
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    if showProBadge {
+                        ProBadge()
+                    }
+                }
+                Text(description)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Spacer()
+
+            if isSelected {
+                Image(systemName: "checkmark")
+                    .foregroundColor(.blue)
+                    .fontWeight(.bold)
+                    .transition(.scale.combined(with: .opacity))
+            }
+        }
+        .contentShape(Rectangle())
+        .animation(.easeInOut(duration: 0.2), value: isSelected)
+    }
+}
+
+struct ModelSelectionRow: View {
+    let model: AIModel
+    let isSelected: Bool
+    let isPro: Bool
+    let onSelect: () -> Void
+    let onRequirePro: () -> Void
+
+    var body: some View {
+        Button {
+            if model.requiresPro && !isPro {
+                onRequirePro()
+            } else {
+                onSelect()
+            }
+        } label: {
+            ModelRowView(
+                title: model.displayName,
+                description: model.description,
+                showProBadge: model.requiresPro && !isPro,
+                isSelected: isSelected
+            )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+struct LanguageRowView: View {
+    let title: String
+    let subtitle: String
+    let isSelected: Bool
+
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            Spacer()
+            if isSelected {
+                Image(systemName: "checkmark")
+                    .foregroundColor(.blue)
+                    .fontWeight(.bold)
+            }
+        }
+        .contentShape(Rectangle())
+    }
 }
 
 struct LoggingOptionsView: View {
@@ -317,6 +404,159 @@ struct CallButtonView: View {
     }
 }
 
+struct MicrophoneActivityView: View {
+    @ObservedObject private var monitor = MicrophoneLevelMonitor.shared
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .center, spacing: 12) {
+                Image(systemName: "waveform.circle.fill")
+                    .font(.system(size: 34))
+                    .foregroundColor(.blue)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(monitor.isMonitoring ? "Microphone is live" : "Starting microphone…")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    Text("Speak naturally—your assistant is listening.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+            }
+
+            ZStack {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.blue.opacity(0.15),
+                                Color.cyan.opacity(0.08)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(Color.white.opacity(0.25))
+                    )
+
+                MicrophoneWaveformCanvas(level: monitor.level)
+                    .padding(.horizontal, 6)
+            }
+            .frame(height: 70)
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 32, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 32, style: .continuous)
+                .stroke(Color.blue.opacity(0.1))
+        )
+        .shadow(color: Color.black.opacity(0.08), radius: 20, x: 0, y: 12)
+        .onAppear {
+            monitor.startMonitoring()
+        }
+        .onDisappear {
+            monitor.stopMonitoring()
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(monitor.isMonitoring ? "Microphone is live" : "Starting microphone")
+        .accessibilityValue("Input level \(Int(monitor.level * 100)) percent")
+    }
+}
+
+struct MicrophoneWaveformCanvas: View {
+    var level: CGFloat
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 45.0)) { timeline in
+            let time = timeline.date.timeIntervalSinceReferenceDate
+            Canvas { context, size in
+                drawBackground(in: &context, size: size)
+                drawWaves(in: &context, size: size, time: time)
+            }
+        }
+    }
+
+    private func drawBackground(in context: inout GraphicsContext, size: CGSize) {
+        let path = Path(roundedRect: CGRect(origin: .zero, size: size), cornerRadius: 16)
+        context.fill(
+            path,
+            with: .linearGradient(
+                Gradient(colors: [Color.white.opacity(0.08), Color.white.opacity(0.02)]),
+                startPoint: CGPoint(x: 0, y: 0),
+                endPoint: CGPoint(x: 0, y: size.height)
+            )
+        )
+    }
+
+    private func drawWaves(in context: inout GraphicsContext, size: CGSize, time: TimeInterval) {
+        let normalized = max(0.08, level)
+        let baseAmplitude = normalized * (size.height / 2.0)
+
+        let waves: [Wave] = [
+            Wave(multiplier: 1.0, frequency: 2.2, speed: 1.6, lineWidth: 3, phaseOffset: 0, color: Color.blue),
+            Wave(multiplier: 0.65, frequency: 3.4, speed: 1.1, lineWidth: 2.2, phaseOffset: .pi / 2, color: Color.cyan),
+            Wave(multiplier: 0.35, frequency: 4.6, speed: 0.9, lineWidth: 1.3, phaseOffset: .pi, color: Color.blue.opacity(0.6))
+        ]
+
+        for wave in waves {
+            let amplitude = max(1, baseAmplitude * wave.multiplier)
+            let phase = CGFloat(time) * wave.speed + wave.phaseOffset
+            let path = wavePath(size: size, amplitude: amplitude, phase: phase, frequency: wave.frequency)
+            let shading = GraphicsContext.Shading.linearGradient(
+                Gradient(colors: [
+                    wave.color.opacity(0.9),
+                    wave.color.opacity(0.4)
+                ]),
+                startPoint: CGPoint(x: 0, y: 0),
+                endPoint: CGPoint(x: size.width, y: size.height)
+            )
+
+            context.stroke(
+                path,
+                with: shading,
+                style: StrokeStyle(
+                    lineWidth: wave.lineWidth,
+                    lineCap: .round,
+                    lineJoin: .round
+                )
+            )
+        }
+    }
+
+    private func wavePath(size: CGSize, amplitude: CGFloat, phase: CGFloat, frequency: CGFloat) -> Path {
+        var path = Path()
+        let width = size.width
+        let midY = size.height / 2
+        let step = max(1, width / 90)
+
+        path.move(to: CGPoint(x: 0, y: midY))
+
+        var x: CGFloat = 0
+        while x <= width {
+            let progress = x / width
+            let angle = progress * frequency * .pi * 2 + phase
+            let y = midY + sin(angle) * amplitude
+            path.addLine(to: CGPoint(x: x, y: y))
+            x += step
+        }
+
+        return path
+    }
+
+    private struct Wave {
+        let multiplier: CGFloat
+        let frequency: CGFloat
+        let speed: CGFloat
+        let lineWidth: CGFloat
+        let phaseOffset: CGFloat
+        let color: Color
+    }
+}
+
 struct StatusIndicatorView: View {
     let isLoggingEnabled: Bool
     
@@ -397,69 +637,97 @@ struct ConnectingOverlayView: View {
     }
 }
 
+struct ProBadge: View {
+    var body: some View {
+        Text("PRO")
+            .font(.caption2)
+            .fontWeight(.bold)
+            .foregroundColor(.white)
+            .padding(.horizontal, 4)
+            .padding(.vertical, 1)
+            .background(Color.blue)
+            .cornerRadius(3)
+    }
+}
+
 struct ModelPickerView: View {
     @ObservedObject var settings: UserSettings
     @StateObject private var subscriptionManager = SubscriptionManager.shared
     @State private var showUpgradeAlert = false
+    @State private var showPaywall = false
+
+    private var providerSections: [ModelProviderSection] {
+        AIModelProvider.allCases.map { provider in
+            ModelProviderSection(provider: provider, models: AIModel.models(for: provider))
+        }
+    }
 
     var body: some View {
-        List {
-            ForEach(AIModelProvider.allCases, id: \.self) { provider in
-                let models = AIModel.models(for: provider)
-                Section(provider.displayName) {
-                    ForEach(models, id: \.self) { model in
-                        Button {
-                            if model.requiresPro && !subscriptionManager.state.isActive {
-                                HapticFeedbackService.shared.warning()
-                                showUpgradeAlert = true
-                                return
-                            }
-                            HapticFeedbackService.shared.selection()
-                            settings.selectedModel = model
-                        } label: {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    HStack(spacing: 6) {
-                                        Text(model.displayName)
-                                            .font(.headline)
-                                            .foregroundColor(.primary)
+        let isProActive = subscriptionManager.state.isActive
+        let selectModel: (AIModel) -> Void = { model in
+            HapticFeedbackService.shared.selection()
+            settings.selectedModel = model
+        }
+        let requirePro: () -> Void = {
+            HapticFeedbackService.shared.warning()
+            showUpgradeAlert = true
+        }
 
-                                        if model.requiresPro && !subscriptionManager.state.isActive {
-                                            ProBadge()
-                                        }
-                                    }
-                                    Text(model.description)
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-
-                                Spacer()
-
-                                if settings.selectedModel == model {
-                                    Image(systemName: "checkmark")
-                                        .foregroundColor(.blue)
-                                        .fontWeight(.bold)
-                                        .transition(.scale.combined(with: .opacity))
-                                }
-                            }
-                            .contentShape(Rectangle())
-                            .animation(.easeInOut(duration: 0.2), value: settings.selectedModel == model)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
+        return List {
+            ForEach(providerSections) { section in
+                ModelSectionView(
+                    section: section,
+                    selectedModel: settings.selectedModel,
+                    isProActive: isProActive,
+                    onSelect: selectModel,
+                    onRequirePro: requirePro
+                )
             }
         }
         .alert("Shaw Pro required", isPresented: $showUpgradeAlert) {
             Button("Later", role: .cancel) { }
             Button("Upgrade") {
-                AppCoordinator.shared.navigate(to: .paywall)
+                showPaywall = true
             }
         } message: {
-            Text("This model is available for Shaw Pro members. Upgrade to unlock it or pick GPT-4o Mini.")
+            Text("This model is available for Shaw Pro members. Upgrade to unlock it or pick GPT-5.1 Nano.")
+        }
+        .sheet(isPresented: $showPaywall) {
+            PaywallView()
         }
         .navigationTitle("AI Model")
         .navigationBarTitleDisplayMode(.large)
+    }
+}
+
+private struct ModelProviderSection: Identifiable {
+    let provider: AIModelProvider
+    let models: [AIModel]
+
+    var id: AIModelProvider { provider }
+}
+
+private struct ModelSectionView: View {
+    let section: ModelProviderSection
+    let selectedModel: AIModel
+    let isProActive: Bool
+    let onSelect: (AIModel) -> Void
+    let onRequirePro: () -> Void
+
+    var body: some View {
+        Section(section.provider.displayName) {
+            ForEach(section.models, id: \.self) { model in
+                ModelSelectionRow(
+                    model: model,
+                    isSelected: selectedModel == model,
+                    isPro: isProActive,
+                    onSelect: {
+                        onSelect(model)
+                    },
+                    onRequirePro: onRequirePro
+                )
+            }
+        }
     }
 }
 
@@ -482,22 +750,11 @@ struct LanguagePickerView: View {
                         HapticFeedbackService.shared.selection()
                         settings.selectedLanguage = language
                     } label: {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(language.displayName)
-                                    .font(.headline)
-                                    .foregroundColor(.primary)
-                                Text(languageSubtitle(for: language))
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            Spacer()
-                            if settings.selectedLanguage == language {
-                                Image(systemName: "checkmark")
-                                    .foregroundColor(.blue)
-                                    .fontWeight(.bold)
-                            }
-                        }
+                        LanguageRowView(
+                            title: language.displayName,
+                            subtitle: languageSubtitle(for: language),
+                            isSelected: settings.selectedLanguage == language
+                        )
                     }
                     .buttonStyle(.plain)
                 }
@@ -625,19 +882,6 @@ struct VoicePickerView: View {
                 settings.selectedLanguage = first
             }
         }
-    }
-}
-
-struct ProBadge: View {
-    var body: some View {
-        Text("PRO")
-            .font(.caption2)
-            .fontWeight(.bold)
-            .foregroundColor(.white)
-            .padding(.horizontal, 4)
-            .padding(.vertical, 1)
-            .background(Color.blue)
-            .cornerRadius(3)
     }
 }
 

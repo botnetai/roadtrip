@@ -14,6 +14,9 @@ struct Session: Identifiable, Codable {
     let loggingEnabledSnapshot: Bool
     var summaryStatus: SummaryStatus
     var summaryError: String?
+    var summaryTitle: String?
+    var summarySnippet: String?
+    var summaryText: String?
     var durationMinutes: Int?
 
     enum SessionContext: String, Codable {
@@ -74,4 +77,49 @@ struct StartSessionResponse: Codable {
     let livekitUrl: String
     let livekitToken: String
     let roomName: String
+}
+
+extension Session {
+    var displayTitle: String {
+        if let title = summaryTitle?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !title.isEmpty {
+            return title
+        }
+
+        switch context {
+        case .carplay:
+            return "CarPlay Session"
+        case .phone:
+            return "Phone Session"
+        }
+    }
+
+    var displaySnippet: String {
+        if let snippet = summarySnippet?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !snippet.isEmpty {
+            return snippet
+        }
+
+        switch summaryStatus {
+        case .failed:
+            return "Summary unavailable"
+        case .pending:
+            return "Processing summary..."
+        case .ready:
+            return context.rawValue.capitalized
+        }
+    }
+}
+
+extension SessionListItem {
+    static func from(session: Session) -> SessionListItem {
+        SessionListItem(
+            id: session.id,
+            title: session.displayTitle,
+            summarySnippet: session.displaySnippet,
+            startedAt: session.startedAt,
+            endedAt: session.endedAt,
+            context: session.context
+        )
+    }
 }

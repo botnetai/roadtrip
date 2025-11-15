@@ -17,8 +17,11 @@ struct SessionDetailScreen: View {
     @State private var showShareTranscript = false
     @State private var showSuccessMessage = false
     @State private var successMessage = ""
+    @State private var autoRefreshTask: Task<Void, Never>?
+    @State private var isFetchingDetails = false
     @ObservedObject var appCoordinator = AppCoordinator.shared
     @StateObject private var hybridLogger = HybridSessionLogger.shared
+    private let autoRefreshInterval: UInt64 = 6 * 1_000_000_000
     
     var body: some View {
         ScrollView {
@@ -146,36 +149,106 @@ struct SessionDetailScreen: View {
         .onAppear {
             loadSessionDetails()
         }
+        .onDisappear {
+            stopAutoRefresh()
+        }
     }
     
-    private func loadSessionDetails() {
-        isLoading = true
-        errorMessage = nil
-        session = nil
-        summary = nil
-        turns = []
+    private func loadSessionDetails(resetState: Bool = true) {
+        guard !isFetchingDetails else { return }
+
+        if resetState {
+            isLoading = true
+            errorMessage = nil
+            session = nil
+            summary = nil
+            turns = []
+        }
+        
+        isFetchingDetails = true
 
         Task {
             do {
                 let detail = try await SessionLogger.shared.fetchSessionDetailWithRetry(sessionID: sessionID)
+                var processedSession = detail.session
+                if let summary = detail.summary {
+                    processedSession.summaryTitle = summary.title
+                    processedSession.summarySnippet = snippet(from: summary.summaryText)
+                    processedSession.summaryText = summary.summaryText
+                    processedSession.summaryStatus = .ready
+                }
                 let summaryPresent = detail.summary != nil
                 let turnsCount = detail.turns.count
                 let firstTurnPreview = detail.turns.first?.text.prefix(80) ?? ""
                 print("📄 Detail fetched — summary: \(summaryPresent), turns: \(turnsCount), first: \(firstTurnPreview)")
                 await MainActor.run {
-                    self.session = detail.session
+                    self.session = processedSession
                     self.summary = detail.summary
                     self.turns = detail.turns
                     self.isLoading = false
+                    self.errorMessage = nil
+                    self.isFetchingDetails = false
+                }
+                await syncSummaryToCloudKit(with: detail)
+                await MainActor.run {
+                    handleAutoRefreshState(for: detail)
                 }
             } catch {
+                print("📡 Session load error: \(error)")
                 await MainActor.run {
-                    self.errorMessage = "Failed to load session: \(error.localizedDescription)"
+                    if resetState || self.session == nil {
+                        self.errorMessage = "Failed to load session: \(error.localizedDescription)"
+                        self.session = nil
+                        self.summary = nil
+                        self.turns = []
+                    }
                     self.isLoading = false
-                    print("📡 Session load error: \(error)")
+                    self.isFetchingDetails = false
                 }
             }
         }
+    }
+    
+    @MainActor
+    private func handleAutoRefreshState(for detail: SessionDetailData) {
+        if shouldAutoRefresh(for: detail) {
+            startAutoRefresh()
+        } else {
+            stopAutoRefresh()
+        }
+    }
+    
+    @MainActor
+    private func startAutoRefresh() {
+        guard autoRefreshTask == nil else { return }
+        
+        autoRefreshTask = Task {
+            while !Task.isCancelled {
+                do {
+                    try await Task.sleep(nanoseconds: autoRefreshInterval)
+                } catch {
+                    break
+                }
+                
+                if Task.isCancelled {
+                    break
+                }
+                
+                await MainActor.run {
+                    loadSessionDetails(resetState: false)
+                }
+            }
+        }
+    }
+    
+    @MainActor
+    private func stopAutoRefresh() {
+        autoRefreshTask?.cancel()
+        autoRefreshTask = nil
+    }
+    
+    private func shouldAutoRefresh(for detail: SessionDetailData) -> Bool {
+        detail.summary == nil && detail.session.summaryStatus == .pending
     }
     
     private func deleteSession() {
@@ -225,6 +298,30 @@ struct SessionDetailScreen: View {
         let formatter = DateFormatter()
         formatter.timeStyle = .short
         return formatter.string(from: date)
+    }
+
+    private func syncSummaryToCloudKit(with detail: SessionDetailData) async {
+        guard await CloudKitSyncService.shared.isICloudAvailable() else { return }
+
+        var sessionToSave = detail.session
+        if let summary = detail.summary {
+            sessionToSave.summaryTitle = summary.title
+            sessionToSave.summarySnippet = snippet(from: summary.summaryText)
+            sessionToSave.summaryText = summary.summaryText
+            sessionToSave.summaryStatus = .ready
+        }
+
+        try? await CloudKitSyncService.shared.saveSession(sessionToSave)
+    }
+
+    private func snippet(from text: String) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count > 180 else {
+            return trimmed
+        }
+
+        let index = trimmed.index(trimmed.startIndex, offsetBy: 180)
+        return String(trimmed[..<index]) + "…"
     }
 }
 
@@ -359,9 +456,7 @@ struct SummarySection: View {
                 request.httpMethod = "PUT"
                 request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-                if let token = AuthService.shared.authToken {
-                    request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-                }
+                AuthService.shared.applyAuthHeaders(to: &request)
 
                 let body = ["title": trimmedTitle]
                 request.httpBody = try JSONSerialization.data(withJSONObject: body)
