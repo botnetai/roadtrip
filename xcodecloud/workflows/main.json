@@ -1,0 +1,33 @@
+{
+  "name": "Shaw - Main CI",
+  "description": "Build and test every push to main.",
+  "containerFilePath": "Shaw.xcodeproj",
+  "isEnabled": true,
+  "isLockedForEditing": false,
+  "clean": false,
+  "branchStartCondition": {
+    "source": {
+      "isAllMatch": false,
+      "patterns": [
+        {
+          "pattern": "main",
+          "isPrefix": false
+        }
+      ]
+    },
+    "filesAndFoldersRule": {
+      "mode": "START_IF_ANY_FILE_MATCHES",
+      "matchers": []
+    },
+    "autoCancel": true
+  },
+  "actions": [
+    {
+      "name": "Archive Shaw",
+      "actionType": "ARCHIVE",
+      "scheme": "Shaw",
+      "platform": "IOS",
+      "isRequiredToPass": true
+    }
+  ]
+}

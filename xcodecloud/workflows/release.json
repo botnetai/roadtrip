@@ -1,0 +1,33 @@
+{
+  "name": "Shaw - Release CI",
+  "description": "Archive release/* branches for TestFlight.",
+  "containerFilePath": "Shaw.xcodeproj",
+  "isEnabled": true,
+  "isLockedForEditing": false,
+  "clean": true,
+  "branchStartCondition": {
+    "source": {
+      "isAllMatch": false,
+      "patterns": [
+        {
+          "pattern": "release/",
+          "isPrefix": true
+        }
+      ]
+    },
+    "filesAndFoldersRule": {
+      "mode": "START_IF_ANY_FILE_MATCHES",
+      "matchers": []
+    },
+    "autoCancel": false
+  },
+  "actions": [
+    {
+      "name": "Archive Release",
+      "actionType": "ARCHIVE",
+      "scheme": "Shaw",
+      "platform": "IOS",
+      "isRequiredToPass": true
+    }
+  ]
+}
