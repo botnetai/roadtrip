@@ -542,6 +542,7 @@ app.post('/v1/sessions/start', authenticateToken, async (req, res) => {
       'claude-haiku-4-5',
       // Google models available through LiveKit Inference
       'google/gemini-2.5-pro',
+      'google/gemini-2.5-flash',
       'google/gemini-2.5-flash-lite',
       // xAI Grok models
       'xai/grok-4',
@@ -560,7 +561,16 @@ app.post('/v1/sessions/start', authenticateToken, async (req, res) => {
     let modelSubstitution = null;
 
     if (!useRealtimeMode && normalizedToolCalling) {
-      const toolCapableModels = ['openai/gpt-5.1', 'openai/gpt-5.1-mini', 'openai/gpt-5.1-nano'];
+      const toolCapableModels = [
+        'openai/gpt-5.1',
+        'openai/gpt-5.1-mini',
+        'openai/gpt-5.1-nano',
+        'claude-sonnet-4-5',
+        'claude-haiku-4-5',
+        'google/gemini-2.5-pro',
+        'google/gemini-2.5-flash',
+        'google/gemini-2.5-flash-lite'
+      ];
       if (!toolCapableModels.includes(selectedModel)) {
         console.warn(`⚠️  Tool calling requested but model ${selectedModel} is not in the tool-capable allowlist. Falling back to openai/gpt-5.1-nano.`);
         modelSubstitution = {

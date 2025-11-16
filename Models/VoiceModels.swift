@@ -241,9 +241,6 @@ enum AIModel: String, Codable, CaseIterable {
     case grok4 = "xai/grok-4"
     case grok4Mini = "xai/grok-4-mini"
 
-    // Other Models
-    case deepseekV3 = "deepseek-ai/deepseek-v3"
-
     init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
         let value = try container.decode(String.self)
@@ -291,8 +288,6 @@ enum AIModel: String, Codable, CaseIterable {
             return .google
         case .grok4, .grok4Mini:
             return .xai
-        case .deepseekV3:
-            return .other
         }
     }
 
@@ -308,7 +303,6 @@ enum AIModel: String, Codable, CaseIterable {
         case .gemini25FlashLite: return "Gemini 2.5 Flash Lite"
         case .grok4: return "Grok 4"
         case .grok4Mini: return "Grok 4 Mini"
-        case .deepseekV3: return "DeepSeek V3"
         }
     }
 
@@ -324,7 +318,6 @@ enum AIModel: String, Codable, CaseIterable {
         case .gemini25FlashLite: return "Ultra-fast Gemini"
         case .grok4: return "Grok 4 - Cutting-edge xAI model"
         case .grok4Mini: return "Grok 4 Mini - Faster Grok variant"
-        case .deepseekV3: return "DeepSeek V3 - Open source reasoning"
         }
     }
 

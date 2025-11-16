@@ -4,11 +4,19 @@ import sys
 import asyncio
 import time
 import aiohttp
+import json
+from typing import AsyncIterator, Callable
 from dotenv import load_dotenv
+from anthropic import AsyncAnthropic, APIStatusError as AnthropicAPIStatusError
+import google.generativeai as genai
 from livekit import agents
 from livekit.agents import AgentSession, Agent, RoomInputOptions, function_tool, RunContext
 from livekit.agents import inference
 from livekit.agents import io as agents_io
+from livekit.agents import utils as agent_utils
+from livekit.agents.inference.llm import to_fnc_ctx
+from livekit.agents.types import DEFAULT_API_CONNECT_OPTIONS, NOT_GIVEN
+from livekit.agents._exceptions import APIConnectionError, APIStatusError
 from livekit.plugins import openai, cartesia
 
 # Load environment variables from .env file
@@ -45,9 +53,13 @@ def verify_env():
     cartesia = os.getenv('CARTESIA_API_KEY')
     eleven = os.getenv('ELEVENLABS_API_KEY')
     perplexity = os.getenv('PERPLEXITY_API_KEY')
+    anthropic = os.getenv('ANTHROPIC_API_KEY')
+    gemini = os.getenv('GEMINI_API_KEY')
     logger.info(f"   CARTESIA_API_KEY: {cartesia[:6] + '...' if cartesia else 'not set'}")
     logger.info(f"   ELEVENLABS_API_KEY: {eleven[:6] + '...' if eleven else 'not set'}")
     logger.info(f"   PERPLEXITY_API_KEY: {perplexity[:6] + '...' if perplexity else 'not set'}")
+    logger.info(f"   ANTHROPIC_API_KEY: {anthropic[:6] + '...' if anthropic else 'not set'}")
+    logger.info(f"   GEMINI_API_KEY: {gemini[:6] + '...' if gemini else 'not set'}")
     return True
 
 # Backend API configuration
@@ -60,27 +72,365 @@ LANGUAGE_DISPLAY_NAMES = {
     "es-MX": "Spanish (Mexico)",
 }
 
-DEFAULT_LLM_MODEL = "openai/gpt-4.1-nano"
-LLM_MODEL_FALLBACKS: dict[str, str] = {
-    "openai/gpt-5.1": "openai/gpt-4.1",
-    "openai/gpt-5.1-mini": "openai/gpt-4.1-mini",
-    "openai/gpt-5.1-nano": "openai/gpt-4.1-nano",
-    "openai/gpt-5": "openai/gpt-4.1",
-    "openai/gpt-5-mini": "openai/gpt-4.1-mini",
-    "openai/gpt-5-nano": "openai/gpt-4.1-nano",
+DEFAULT_OPENAI_CHAT_MODEL = "gpt-5.1-nano"
+
+def resolve_openai_chat_model(model: str | None) -> str:
+    """Convert internal identifiers (e.g. openai/gpt-5.1-nano) to OpenAI chat model names."""
+    normalized = (model or "").strip()
+    if not normalized:
+        return DEFAULT_OPENAI_CHAT_MODEL
+
+    if normalized.startswith("openai/"):
+        return normalized.split("/", 1)[1]
+
+    logger.warning(f"⚠️  Unsupported provider for non-realtime mode: {normalized}. Falling back to {DEFAULT_OPENAI_CHAT_MODEL}")
+    return DEFAULT_OPENAI_CHAT_MODEL
+
+ANTHROPIC_MODEL_CANDIDATES: dict[str, list[str]] = {
+    "claude-sonnet-4-5": [
+        "claude-3-5-sonnet-20241022",
+        "claude-3-opus-20240229",
+    ],
+    "claude-haiku-4-5": [
+        "claude-3-5-haiku-20241022",
+        "claude-3-haiku-20240307",
+    ],
 }
 
-def resolve_llm_model(model: str | None) -> str:
-    """Map marketing model identifiers to LiveKit-compatible models."""
-    if not model or not model.strip():
-        return DEFAULT_LLM_MODEL
+GOOGLE_MODEL_MAP: dict[str, str] = {
+    "google/gemini-2.5-pro": "models/gemini-2.5-pro",
+    "google/gemini-2.5-flash": "models/gemini-2.5-flash",
+    "google/gemini-2.5-flash-lite": "models/gemini-2.5-flash-lite-preview-06-17",
+}
 
-    normalized = model.strip()
-    fallback = LLM_MODEL_FALLBACKS.get(normalized)
-    if fallback:
-        logger.warning(f"⚠️  LLM model {normalized} unsupported on LiveKit Inference, falling back to {fallback}")
-        return fallback
-    return normalized
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+anthropic_client = AsyncAnthropic(api_key=ANTHROPIC_API_KEY) if ANTHROPIC_API_KEY else None
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
+
+
+class ExternalLLM(agents.llm.LLM):
+    def __init__(
+        self,
+        *,
+        provider: str,
+        model_key: str,
+        fetch_fn: Callable[
+            [agents.llm.ChatContext, list[agents.llm.FunctionTool | agents.llm.RawFunctionTool]],
+            AsyncIterator[agents.llm.ChatChunk],
+        ],
+    ) -> None:
+        super().__init__()
+        self._provider = provider
+        self._model_key = model_key
+        self._fetch_fn = fetch_fn
+
+    @property
+    def model(self) -> str:
+        return self._model_key
+
+    @property
+    def provider(self) -> str:
+        return self._provider
+
+    def chat(
+        self,
+        *,
+        chat_ctx: agents.llm.ChatContext,
+        tools: list[agents.llm.FunctionTool | agents.llm.RawFunctionTool] | None = None,
+        conn_options=DEFAULT_API_CONNECT_OPTIONS,
+        parallel_tool_calls=NOT_GIVEN,
+        tool_choice=NOT_GIVEN,
+        extra_kwargs=NOT_GIVEN,
+    ) -> agents.llm.LLMStream:
+        return ExternalLLMStream(
+            self,
+            chat_ctx=chat_ctx,
+            tools=tools or [],
+            conn_options=conn_options,
+            fetch_fn=self._fetch_fn,
+        )
+
+
+class ExternalLLMStream(agents.llm.LLMStream):
+    def __init__(
+        self,
+        llm: agents.llm.LLM,
+        *,
+        chat_ctx: agents.llm.ChatContext,
+        tools: list[agents.llm.FunctionTool | agents.llm.RawFunctionTool],
+        conn_options,
+        fetch_fn: Callable[
+            [agents.llm.ChatContext, list[agents.llm.FunctionTool | agents.llm.RawFunctionTool]],
+            AsyncIterator[agents.llm.ChatChunk],
+        ],
+    ) -> None:
+        super().__init__(llm, chat_ctx=chat_ctx, tools=tools, conn_options=conn_options)
+        self._fetch_fn = fetch_fn
+
+    async def _run(self) -> None:
+        async for chunk in self._fetch_fn(self._chat_ctx, self._tools):
+            self._event_ch.send_nowait(chunk)
+
+
+def build_anthropic_tool_schemas(
+    tools: list[agents.llm.FunctionTool | agents.llm.RawFunctionTool],
+) -> list[dict[str, object]]:
+    schemas: list[dict[str, object]] = []
+    for tool in to_fnc_ctx(tools, strict=True):
+        fnc = tool.get("function", {})
+        if not fnc:
+            continue
+        params = fnc.get("parameters") or {"type": "object", "properties": {}}
+        schemas.append(
+            {
+                "name": fnc.get("name", "function"),
+                "description": fnc.get("description", ""),
+                "input_schema": params,
+            }
+        )
+    return schemas
+
+
+def _convert_schema_for_gemini(value: dict[str, object]) -> dict[str, object]:
+    converted: dict[str, object] = {}
+    for key, val in value.items():
+        if key == "type" and isinstance(val, str):
+            converted[key] = val.upper()
+        elif key == "properties" and isinstance(val, dict):
+            converted[key] = {k: _convert_schema_for_gemini(v) for k, v in val.items()}
+        elif key == "items" and isinstance(val, dict):
+            converted[key] = _convert_schema_for_gemini(val)
+        else:
+            converted[key] = val
+    return converted
+
+
+def build_gemini_tool_declarations(
+    tools: list[agents.llm.FunctionTool | agents.llm.RawFunctionTool],
+) -> list[dict[str, object]]:
+    declarations: list[dict[str, object]] = []
+    for tool in to_fnc_ctx(tools, strict=True):
+        fnc = tool.get("function", {})
+        if not fnc:
+            continue
+        schema = fnc.get("parameters") or {"type": "object", "properties": {}}
+        declarations.append(
+            {
+                "name": fnc.get("name", "function"),
+                "description": fnc.get("description", ""),
+                "parameters": _convert_schema_for_gemini(schema),
+            }
+        )
+    return declarations
+
+
+async def anthropic_chat_stream(
+    model_key: str,
+    chat_ctx: agents.llm.ChatContext,
+    tools: list[agents.llm.FunctionTool | agents.llm.RawFunctionTool],
+) -> AsyncIterator[agents.llm.ChatChunk]:
+    if not anthropic_client:
+        raise APIConnectionError("Anthropic API key not configured.", retryable=False)
+
+    messages, meta = chat_ctx.to_provider_format("anthropic")
+    system_prompt = "\n\n".join(meta.system_messages) if meta and meta.system_messages else None
+    tool_specs = build_anthropic_tool_schemas(tools)
+    candidates = ANTHROPIC_MODEL_CANDIDATES.get(model_key, [model_key])
+
+    for idx, candidate in enumerate(candidates):
+        try:
+            system_blocks = (
+                [{"type": "text", "text": system_prompt}] if system_prompt else None
+            )
+            request_kwargs = {
+                "model": candidate,
+                "max_tokens": 800,
+                "messages": messages,
+            }
+            if system_blocks:
+                request_kwargs["system"] = system_blocks
+            if tool_specs:
+                request_kwargs["tools"] = tool_specs
+            response = await anthropic_client.messages.create(**request_kwargs)
+
+            chunk_id = response.id or agent_utils.shortuuid("anthropic_")
+            text_parts: list[str] = []
+            tool_calls: list[agents.llm.FunctionToolCall] = []
+            for block in response.content or []:
+                block_type = getattr(block, "type", None)
+                if block_type == "text":
+                    text = getattr(block, "text", None)
+                    if text:
+                        text_parts.append(text)
+                elif block_type == "tool_use":
+                    input_payload = getattr(block, "input", {}) or {}
+                    tool_calls.append(
+                        agents.llm.FunctionToolCall(
+                            arguments=json.dumps(input_payload),
+                            name=getattr(block, "name", "tool"),
+                            call_id=getattr(block, "id", agent_utils.shortuuid("tool_")),
+                        )
+                    )
+
+            if text_parts:
+                yield agents.llm.ChatChunk(
+                    id=chunk_id,
+                    delta=agents.llm.ChoiceDelta(role="assistant", content="\n\n".join(text_parts)),
+                )
+            if tool_calls:
+                yield agents.llm.ChatChunk(
+                    id=f"{chunk_id}_tool",
+                    delta=agents.llm.ChoiceDelta(role="assistant", tool_calls=tool_calls),
+                )
+
+            usage = getattr(response, "usage", None)
+            if usage:
+                yield agents.llm.ChatChunk(
+                    id=f"{chunk_id}_usage",
+                    usage=agents.llm.CompletionUsage(
+                        completion_tokens=getattr(usage, "output_tokens", 0) or 0,
+                        prompt_tokens=getattr(usage, "input_tokens", 0) or 0,
+                        prompt_cached_tokens=0,
+                        total_tokens=getattr(usage, "input_tokens", 0) + getattr(usage, "output_tokens", 0),
+                    ),
+                )
+            return
+        except AnthropicAPIStatusError as err:
+            if err.status_code == 404 and idx < len(candidates) - 1:
+                continue
+            raise APIStatusError(
+                err.message,
+                status_code=err.status_code,
+                body=getattr(err, "response", None),
+                retryable=err.status_code >= 500,
+            ) from err
+        except Exception as err:
+            raise APIConnectionError(str(err), retryable=False) from err
+
+
+async def gemini_chat_stream(
+    model_key: str,
+    chat_ctx: agents.llm.ChatContext,
+    tools: list[agents.llm.FunctionTool | agents.llm.RawFunctionTool],
+) -> AsyncIterator[agents.llm.ChatChunk]:
+    if not GEMINI_API_KEY:
+        raise APIConnectionError("Gemini API key not configured.", retryable=False)
+
+    api_model = GOOGLE_MODEL_MAP.get(model_key, "models/gemini-2.5-flash")
+    turns, meta = chat_ctx.to_provider_format("google")
+    system_prompt = "\n\n".join(meta.system_messages) if meta and meta.system_messages else None
+    tool_decls = build_gemini_tool_declarations(tools)
+
+    payload: dict[str, object] = {"contents": turns}
+    if system_prompt:
+        payload["systemInstruction"] = {"role": "system", "parts": [{"text": system_prompt}]}
+    if tool_decls:
+        payload["tools"] = [{"functionDeclarations": tool_decls}]
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/{api_model}:generateContent?key={GEMINI_API_KEY}"
+    timeout = aiohttp.ClientTimeout(total=30)
+
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        async with session.post(url, json=payload) as resp:
+            if resp.status >= 400:
+                body = await resp.text()
+                raise APIStatusError(
+                    f"Gemini request failed ({resp.status})",
+                    status_code=resp.status,
+                    body=body,
+                    retryable=resp.status >= 500,
+                )
+            data = await resp.json()
+
+    candidates = data.get("candidates") or []
+    if not candidates:
+        raise APIConnectionError("Gemini response did not include candidates.", retryable=True)
+
+    candidate = candidates[0]
+    parts = candidate.get("content", {}).get("parts", [])
+    text_parts: list[str] = []
+    tool_calls: list[agents.llm.FunctionToolCall] = []
+
+    for part in parts:
+        if "text" in part and part["text"]:
+            text_parts.append(part["text"])
+        elif "functionCall" in part:
+            fn_call = part["functionCall"]
+            args = fn_call.get("args", {})
+            tool_calls.append(
+                agents.llm.FunctionToolCall(
+                    arguments=json.dumps(args),
+                    name=fn_call.get("name", "function"),
+                    call_id=agent_utils.shortuuid("tool_"),
+                )
+            )
+
+    chunk_id = candidate.get("content", {}).get("id", agent_utils.shortuuid("gemini_"))
+    if text_parts:
+        yield agents.llm.ChatChunk(
+            id=chunk_id,
+            delta=agents.llm.ChoiceDelta(role="assistant", content="\n\n".join(text_parts)),
+        )
+    if tool_calls:
+        yield agents.llm.ChatChunk(
+            id=f"{chunk_id}_tool",
+            delta=agents.llm.ChoiceDelta(role="assistant", tool_calls=tool_calls),
+        )
+
+    usage = data.get("usageMetadata") or {}
+    if usage:
+        yield agents.llm.ChatChunk(
+            id=f"{chunk_id}_usage",
+            usage=agents.llm.CompletionUsage(
+                completion_tokens=usage.get("candidatesTokenCount", 0) or 0,
+                prompt_tokens=usage.get("promptTokenCount", 0) or 0,
+                prompt_cached_tokens=0,
+                total_tokens=usage.get("totalTokenCount", 0) or 0,
+            ),
+        )
+
+
+def infer_model_provider(model: str | None) -> str:
+    if not model:
+        return "openai"
+    if model.startswith("openai/"):
+        return "openai"
+    if model in ANTHROPIC_MODEL_CANDIDATES:
+        return "anthropic"
+    if model in GOOGLE_MODEL_MAP:
+        return "google"
+    return "openai"
+
+
+def create_hybrid_llm(model: str | None) -> agents.llm.LLM:
+    provider = infer_model_provider(model)
+    if provider == "anthropic" and anthropic_client:
+        model_key = model or "claude-sonnet-4-5"
+
+        async def fetch(ctx: agents.llm.ChatContext, ctx_tools: list[agents.llm.FunctionTool | agents.llm.RawFunctionTool]):
+            async for chunk in anthropic_chat_stream(model_key, ctx, ctx_tools):
+                yield chunk
+
+        return ExternalLLM(provider="anthropic", model_key=model_key, fetch_fn=fetch)
+    if provider == "anthropic" and not anthropic_client:
+        logger.warning("Anthropic model requested but ANTHROPIC_API_KEY is not configured. Falling back to OpenAI.")
+
+    if provider == "google" and GEMINI_API_KEY:
+        model_key = model or "google/gemini-2.5-flash-lite"
+
+        async def fetch(ctx: agents.llm.ChatContext, ctx_tools: list[agents.llm.FunctionTool | agents.llm.RawFunctionTool]):
+            async for chunk in gemini_chat_stream(model_key, ctx, ctx_tools):
+                yield chunk
+
+        return ExternalLLM(provider="google", model_key=model_key, fetch_fn=fetch)
+    if provider == "google" and not GEMINI_API_KEY:
+        logger.warning("Gemini model requested but GEMINI_API_KEY is not configured. Falling back to OpenAI.")
+
+    target = resolve_openai_chat_model(model)
+    return openai.chat.ChatModel(model=target)
 
 
 class TranscriptManager:
@@ -559,15 +909,13 @@ async def entrypoint(ctx: agents.JobContext):
 
             logger.info("✅ Full Realtime agent session started successfully")
         else:
-            # Hybrid mode: LiveKit Inference LLM + TTS (Cartesia/ElevenLabs via plugin or LiveKit Inference)
-            logger.info(f"💰 Using HYBRID mode: LiveKit Inference LLM + {voice}")
-            logger.info(f"📢 LLM model: {model}")
+            # Hybrid mode: connect to third-party APIs directly (OpenAI / Anthropic / Gemini)
+            logger.info(f"💰 Using HYBRID mode: Direct LLM + {voice}")
+            logger.info(f"📢 Requested LLM model: {model}")
             logger.info(f"📢 TTS voice: {voice}")
 
-            # Use LiveKit Inference for LLM (not OpenAI Realtime)
-            # Model format: "openai/gpt-5.1", "openai/gpt-5.1-mini", etc.
-            # LiveKit Inference handles the connection automatically
-            llm_model = resolve_llm_model(model)
+            llm_model = create_hybrid_llm(model)
+            logger.info(f"🧠 Resolved provider: {llm_model.provider} ({llm_model.model})")
 
             # Create TTS instance - use plugin if available (bypasses LiveKit Inference TTS limit)
             # Otherwise fall back to LiveKit Inference
@@ -580,7 +928,7 @@ async def entrypoint(ctx: agents.JobContext):
 
             # AgentSession with LiveKit Inference LLM + TTS (plugin or Inference)
             agent_session = AgentSession(
-                llm=llm_model,  # LiveKit Inference LLM (string descriptor)
+                llm=llm_model,  # OpenAI chat completion model (plugin)
                 tts=tts_instance,  # TTS plugin instance or LiveKit Inference descriptor
                 stt=inference.STT.from_model_string(f"deepgram/nova-3:{language}"),
             )
