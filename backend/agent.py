@@ -60,6 +60,28 @@ LANGUAGE_DISPLAY_NAMES = {
     "es-MX": "Spanish (Mexico)",
 }
 
+DEFAULT_LLM_MODEL = "openai/gpt-4.1-nano"
+LLM_MODEL_FALLBACKS: dict[str, str] = {
+    "openai/gpt-5.1": "openai/gpt-4.1",
+    "openai/gpt-5.1-mini": "openai/gpt-4.1-mini",
+    "openai/gpt-5.1-nano": "openai/gpt-4.1-nano",
+    "openai/gpt-5": "openai/gpt-4.1",
+    "openai/gpt-5-mini": "openai/gpt-4.1-mini",
+    "openai/gpt-5-nano": "openai/gpt-4.1-nano",
+}
+
+def resolve_llm_model(model: str | None) -> str:
+    """Map marketing model identifiers to LiveKit-compatible models."""
+    if not model or not model.strip():
+        return DEFAULT_LLM_MODEL
+
+    normalized = model.strip()
+    fallback = LLM_MODEL_FALLBACKS.get(normalized)
+    if fallback:
+        logger.warning(f"⚠️  LLM model {normalized} unsupported on LiveKit Inference, falling back to {fallback}")
+        return fallback
+    return normalized
+
 
 class TranscriptManager:
     """Aggregates streamed transcription chunks and saves finalized turns."""
@@ -545,7 +567,7 @@ async def entrypoint(ctx: agents.JobContext):
             # Use LiveKit Inference for LLM (not OpenAI Realtime)
             # Model format: "openai/gpt-5.1", "openai/gpt-5.1-mini", etc.
             # LiveKit Inference handles the connection automatically
-            llm_model = model or "openai/gpt-5.1-nano"
+            llm_model = resolve_llm_model(model)
 
             # Create TTS instance - use plugin if available (bypasses LiveKit Inference TTS limit)
             # Otherwise fall back to LiveKit Inference
