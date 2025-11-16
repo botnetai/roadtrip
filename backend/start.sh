@@ -1,5 +1,22 @@
 #!/bin/bash
 
+AGENT_LOG_FILE="/tmp/agent.log"
+SERVER_PID=""
+AGENT_SUPERVISOR_PID=""
+
+cleanup() {
+  echo "🛑 Shutdown signal received. Stopping services..."
+  if [[ -n "$SERVER_PID" ]] && kill -0 "$SERVER_PID" 2>/dev/null; then
+    kill "$SERVER_PID" 2>/dev/null || true
+  fi
+  if [[ -n "$AGENT_SUPERVISOR_PID" ]] && kill -0 "$AGENT_SUPERVISOR_PID" 2>/dev/null; then
+    kill "$AGENT_SUPERVISOR_PID" 2>/dev/null || true
+  fi
+  wait "$AGENT_SUPERVISOR_PID" 2>/dev/null || true
+  exit 0
+}
+trap cleanup TERM INT
+
 # Set up library paths for LiveKit Python SDK
 # Nixpacks installs libraries in various locations, we need to find them
 
@@ -89,40 +106,80 @@ if [ -z "$LIVEKIT_URL" ] || [ -z "$LIVEKIT_API_KEY" ] || [ -z "$LIVEKIT_API_SECR
 fi
 echo "✅ LiveKit environment variables are set"
 
-# Start agent worker in background using virtual environment
-echo "🚀 Starting agent worker..."
 cd "$(dirname "$0")" || exit 1  # Ensure we're in the backend directory
-# Log to both file and stdout so Railway captures logs
-$PYTHON_CMD agent.py start 2>&1 | tee /tmp/agent.log &
-AGENT_PID=$!
-echo "✅ Agent worker process started (PID: $AGENT_PID)"
-echo "   Logs: /tmp/agent.log (also streaming to stdout)"
+: > "$AGENT_LOG_FILE"
+echo "🧹 Cleared agent log: $AGENT_LOG_FILE"
 
-# Wait for agent to initialize and connect
+start_agent_supervisor() {
+  local attempt=1
+  local child_pid=0
+  trap 'if [[ $child_pid -ne 0 ]]; then echo "🛑 Stopping agent worker (PID: $child_pid)"; kill $child_pid 2>/dev/null; wait $child_pid 2>/dev/null; fi; exit 0' TERM INT
+  while true; do
+    echo "🚀 Starting agent worker (attempt $attempt)..."
+    "$PYTHON_CMD" agent.py start \
+      > >(tee -a "$AGENT_LOG_FILE") \
+      2> >(tee -a "$AGENT_LOG_FILE" >&2) &
+    child_pid=$!
+    wait $child_pid
+    local exit_code=$?
+    if [[ $exit_code -ne 0 ]]; then
+      echo "⚠️  Agent worker exited with code $exit_code. Restarting in 2s..."
+      echo "   Check $AGENT_LOG_FILE for details."
+    else
+      echo "ℹ️  Agent worker exited cleanly. Restarting to ensure availability..."
+    fi
+    sleep 2
+    attempt=$((attempt + 1))
+  done
+}
+
+# Start agent supervisor in background to auto-restart the worker
+start_agent_supervisor &
+AGENT_SUPERVISOR_PID=$!
+echo "✅ Agent supervisor started (PID: $AGENT_SUPERVISOR_PID)"
+echo "   Logs: $AGENT_LOG_FILE (also streaming to stdout)"
+
+# Wait for the first agent worker instance to come up
 echo "⏳ Waiting for agent worker to connect to LiveKit Cloud..."
-sleep 5
+agent_ready=0
+for _ in {1..15}; do
+  if pgrep -f "agent.py start" >/dev/null; then
+    agent_ready=1
+    break
+  fi
+  sleep 1
+done
 
-# Check if agent process is still running
-if ! kill -0 $AGENT_PID 2>/dev/null; then
-  echo "❌ Agent worker process died. Last 30 lines of agent.log:"
-  tail -30 /tmp/agent.log 2>/dev/null || echo "   (log file not found)"
-  echo ""
-  echo "❌ Exiting due to agent worker failure"
+if [[ $agent_ready -eq 1 ]]; then
+  if grep -q "Connecting to LiveKit Cloud\|agent worker\|Agent name" "$AGENT_LOG_FILE" 2>/dev/null; then
+    echo "✅ Agent worker logs show connection activity"
+  else
+    echo "⚠️  Agent worker running but connection logs not detected yet"
+    tail -10 "$AGENT_LOG_FILE" 2>/dev/null || true
+  fi
+else
+  echo "❌ Agent worker failed to start. Last 30 lines of agent.log:"
+  tail -30 "$AGENT_LOG_FILE" 2>/dev/null || echo "   (log file not found)"
+  kill "$AGENT_SUPERVISOR_PID" 2>/dev/null || true
+  wait "$AGENT_SUPERVISOR_PID" 2>/dev/null || true
   exit 1
 fi
 
-# Check agent logs for connection success indicators
-if grep -q "Connecting to LiveKit Cloud\|agent worker\|Agent name: agent" /tmp/agent.log 2>/dev/null; then
-  echo "✅ Agent worker appears to be connecting (checking logs...)"
-else
-  echo "⚠️  Warning: Agent worker logs don't show expected connection messages"
-  echo "   Last 20 lines of agent.log:"
-  tail -20 /tmp/agent.log 2>/dev/null || echo "   (log file not found)"
+echo "✅ Agent worker supervisor is running"
+echo "   Monitor logs with: tail -f $AGENT_LOG_FILE"
+
+# Start web server in foreground while supervisor keeps agent healthy
+echo "✅ Starting web server..."
+npm start &
+SERVER_PID=$!
+wait $SERVER_PID
+SERVER_EXIT=$?
+echo "❌ Web server exited with code $SERVER_EXIT"
+
+# Stop supervisor on exit to keep process tidy
+if [[ -n "$AGENT_SUPERVISOR_PID" ]] && kill -0 "$AGENT_SUPERVISOR_PID" 2>/dev/null; then
+  kill "$AGENT_SUPERVISOR_PID" 2>/dev/null || true
+  wait "$AGENT_SUPERVISOR_PID" 2>/dev/null || true
 fi
 
-echo "✅ Agent worker is running (PID: $AGENT_PID)"
-echo "   Monitor logs with: tail -f /tmp/agent.log"
-
-# Start web server in foreground
-echo "✅ Starting web server..."
-npm start
+exit $SERVER_EXIT
