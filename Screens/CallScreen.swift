@@ -1,6 +1,6 @@
 //
 //  CallScreen.swift
-//  Shaw
+//  Roadtrip
 //
 
 import SwiftUI
@@ -41,34 +41,33 @@ struct CallScreen: View {
                         } header: {
                             Text("Voice")
                         } footer: {
-                            if settings.selectedVoice.isRealtimeMode {
-                                Text("Ultra-low latency voice conversation with natural, real-time responses")
-                            } else {
-                                Text("High-quality voice synthesis optimized for cost efficiency")
+                            switch settings.selectedVoice.provider {
+                            case .cartesia:
+                                Text("High-quality neural voice optimized for smooth, natural responses")
+                            case .elevenlabs:
+                                Text("Premium ultra-realistic voice tuned for expressive conversations")
                             }
                         }
 
-                        if !settings.selectedVoice.isRealtimeMode {
-                            Section {
-                                NavigationLink(destination: ModelPickerView(settings: settings)) {
-                                    HStack {
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(settings.selectedModel.provider.displayName)
-                                                .font(.subheadline)
-                                                .foregroundColor(.secondary)
-                                            Text(settings.selectedModel.displayName)
-                                                .font(.body)
-                                        }
-                                        Spacer()
+                        Section {
+                            NavigationLink(destination: ModelPickerView(settings: settings)) {
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(settings.selectedModel.provider.displayName)
+                                            .font(.subheadline)
+                                            .foregroundColor(.secondary)
+                                        Text(settings.selectedModel.displayName)
+                                            .font(.body)
                                     }
+                                    Spacer()
                                 }
-                                .accessibilityLabel("AI Model: \(settings.selectedModel.displayName)")
-                                .accessibilityHint("Double tap to change AI model")
-                            } header: {
-                                Text("AI Model")
-                            } footer: {
-                                Text("Choose how smart and fast your assistant responds to your questions")
                             }
+                            .accessibilityLabel("AI Model: \(settings.selectedModel.displayName)")
+                            .accessibilityHint("Double tap to change AI model")
+                        } header: {
+                            Text("AI Model")
+                        } footer: {
+                            Text("Choose how smart and fast your assistant responds to your questions")
                         }
 
                         Section {
@@ -651,6 +650,7 @@ struct ProBadge: View {
 }
 
 struct ModelPickerView: View {
+    @Environment(\.dismiss) private var dismiss
     @ObservedObject var settings: UserSettings
     @StateObject private var subscriptionManager = SubscriptionManager.shared
     @State private var showUpgradeAlert = false
@@ -667,6 +667,7 @@ struct ModelPickerView: View {
         let selectModel: (AIModel) -> Void = { model in
             HapticFeedbackService.shared.selection()
             settings.selectedModel = model
+            dismiss()
         }
         let requirePro: () -> Void = {
             HapticFeedbackService.shared.warning()
@@ -684,13 +685,13 @@ struct ModelPickerView: View {
                 )
             }
         }
-        .alert("Shaw Pro required", isPresented: $showUpgradeAlert) {
+        .alert("Roadtrip Pro required", isPresented: $showUpgradeAlert) {
             Button("Later", role: .cancel) { }
             Button("Upgrade") {
                 showPaywall = true
             }
         } message: {
-            Text("This model is available for Shaw Pro members. Upgrade to unlock it or pick GPT-5.1 Nano.")
+            Text("This model is available for Roadtrip Pro members. Upgrade to unlock it or pick GPT-5.1 Nano.")
         }
         .sheet(isPresented: $showPaywall) {
             PaywallView()
@@ -861,11 +862,6 @@ struct VoicePickerView: View {
                                     .textCase(.none)
                             } else if section.provider == .elevenlabs {
                                 Text("Premium, ultra-realistic voices")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                    .textCase(.none)
-                            } else if section.provider == .openaiRealtime {
-                                Text("Highest quality real-time interactions")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                                     .textCase(.none)

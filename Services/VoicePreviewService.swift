@@ -98,10 +98,6 @@ class VoicePreviewService: NSObject, ObservableObject {
         case .elevenlabs:
             fileExtension = "mp3"
             voiceFileName = getPreviewFileName(for: voice)
-        case .openaiRealtime:
-            // OpenAI Realtime voices use simple IDs like "alloy", "echo", etc.
-            fileExtension = "mp3"
-            voiceFileName = getPreviewFileName(for: voice)
         }
 
         // Construct URL to static preview file

@@ -509,27 +509,25 @@ app.post('/v1/sessions/start', authenticateToken, async (req, res) => {
       });
     }
 
-    // Determine mode from voice ID
-    // OpenAI Realtime voices are simple names without slashes: alloy, echo, fable, onyx, nova, shimmer
-    // Hybrid mode voices have provider prefix: cartesia/sonic-3:..., elevenlabs/...
-    const openAIRealtimeVoices = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'];
-    const selectedVoice = voice && typeof voice === 'string' ? voice : 'cartesia/sonic-3:9626c31c-bec5-4cca-baa8-f8ba9e84c8bc';
-    const useRealtimeMode = openAIRealtimeVoices.includes(selectedVoice);
+    const defaultVoice = 'cartesia/sonic-3:9626c31c-bec5-4cca-baa8-f8ba9e84c8bc';
+    let selectedVoice = typeof voice === 'string' ? voice.trim() : defaultVoice;
+    if (!selectedVoice || !selectedVoice.includes('/')) {
+      console.warn(`⚠️  Unsupported realtime voice requested (${selectedVoice || 'none'}). Falling back to ${defaultVoice}.`);
+      selectedVoice = defaultVoice;
+    }
 
-    if (!useRealtimeMode) {
-      const provider = selectedVoice.includes('/') ? selectedVoice.split('/')[0] : null;
-      if (provider === 'cartesia' && !process.env.CARTESIA_API_KEY) {
-        console.warn('⚠️  CARTESIA_API_KEY not set, using LiveKit Inference for TTS');
-      }
-      if (provider === 'elevenlabs' && !process.env.ELEVENLABS_API_KEY) {
-        console.warn('⚠️  ELEVENLABS_API_KEY not set, using LiveKit Inference for TTS');
-      }
+    const provider = selectedVoice.split('/')[0];
+    if (provider === 'cartesia' && !process.env.CARTESIA_API_KEY) {
+      console.warn('⚠️  CARTESIA_API_KEY not set, using LiveKit Inference for TTS');
+    }
+    if (provider === 'elevenlabs' && !process.env.ELEVENLABS_API_KEY) {
+      console.warn('⚠️  ELEVENLABS_API_KEY not set, using LiveKit Inference for TTS');
     }
 
     const normalizedToolCalling = tool_calling_enabled === undefined ? true : normalizeBoolean(tool_calling_enabled);
     const normalizedWebSearch = web_search_enabled === undefined ? true : normalizeBoolean(web_search_enabled);
 
-    // Validate model if provided (optional) - only for hybrid mode (non-realtime)
+    // Validate model if provided (optional)
     // Models use LiveKit Inference provider/model format
     // See: https://docs.livekit.io/agents/models/#inference
     const validModels = [
@@ -557,10 +555,10 @@ app.post('/v1/sessions/start', authenticateToken, async (req, res) => {
       'xai/grok-4'
     ];
 
-    let selectedModel = useRealtimeMode ? null : (model && validModels.includes(model) ? model : 'openai/gpt-5.1-nano');
+    let selectedModel = model && validModels.includes(model) ? model : 'openai/gpt-5.1-nano';
     let modelSubstitution = null;
 
-    if (!useRealtimeMode && normalizedToolCalling) {
+    if (normalizedToolCalling) {
       const toolCapableModels = [
         'openai/gpt-5.1',
         'openai/gpt-5.1-mini',
@@ -587,7 +585,7 @@ app.post('/v1/sessions/start', authenticateToken, async (req, res) => {
       if (!hasPro) {
         return res.status(403).json({
           error: 'PRO_REQUIRED',
-          message: 'Shaw Pro is required to use this model. Please switch to GPT-5.1 Nano or another non-Pro option.',
+          message: 'Roadtrip Pro is required to use this model. Please switch to GPT-5.1 Nano or another non-Pro option.',
           model: selectedModel,
           suggested_model: 'openai/gpt-5.1-nano'
         });
@@ -618,13 +616,9 @@ app.post('/v1/sessions/start', authenticateToken, async (req, res) => {
     );
 
     // Log configuration for debugging
-    console.log(`Session ${sessionId} started in ${useRealtimeMode ? 'OPENAI REALTIME (Full Audio I/O)' : 'HYBRID (Realtime text-only + TTS)'} mode`);
-    if (useRealtimeMode) {
-      console.log(`  OpenAI Realtime voice: ${selectedVoice}`);
-    } else {
-      console.log(`  Model: ${selectedModel}`);
-      console.log(`  TTS voice: ${selectedVoice}`);
-    }
+    console.log(`Session ${sessionId} started in HYBRID mode`);
+    console.log(`  Model: ${selectedModel}`);
+    console.log(`  TTS voice: ${selectedVoice}`);
     console.log(`  Language: ${normalizedLanguage} (${languageLabel})`);
     console.log(`  Tool calling: ${normalizedToolCalling ? 'enabled' : 'disabled'} | Web search: ${normalizedWebSearch ? 'enabled' : 'disabled'}`);
 
@@ -634,7 +628,6 @@ app.post('/v1/sessions/start', authenticateToken, async (req, res) => {
         sessionId,
         selectedModel,
         selectedVoice,
-        useRealtimeMode,
         normalizedToolCalling,
         normalizedWebSearch,
         normalizedLanguage,
@@ -663,8 +656,8 @@ app.post('/v1/sessions/start', authenticateToken, async (req, res) => {
       livekit_url: livekitUrl,
       livekit_token: livekitToken,
       room_name: roomName,
-      mode: useRealtimeMode ? 'realtime' : 'hybrid',
-      model: selectedModel || (useRealtimeMode ? 'openai-realtime' : 'openai/gpt-5.1-nano'),
+      mode: 'hybrid',
+      model: selectedModel,
       voice: selectedVoice,
       language: normalizedLanguage,
       model_substitution: modelSubstitution

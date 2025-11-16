@@ -63,7 +63,7 @@ def verify_env():
     return True
 
 # Backend API configuration
-BACKEND_URL = os.getenv('BACKEND_URL', 'https://shaw.up.railway.app')
+BACKEND_URL = os.getenv('BACKEND_URL', 'https://roadtrip.up.railway.app')
 
 LANGUAGE_DISPLAY_NAMES = {
     "en-US": "English (US)",
@@ -430,7 +430,7 @@ def create_hybrid_llm(model: str | None) -> agents.llm.LLM:
         logger.warning("Gemini model requested but GEMINI_API_KEY is not configured. Falling back to OpenAI.")
 
     target = resolve_openai_chat_model(model)
-    return openai.chat.ChatModel(model=target)
+    return openai.llm.LLM(model=target)
 
 
 class TranscriptManager:
@@ -763,11 +763,10 @@ async def save_turn(session_id: str, speaker: str, text: str):
         logger.error(f"   Session ID: {session_id[:20]}..., Speaker: {speaker}")
 
 async def entrypoint(ctx: agents.JobContext):
-    """Entry point for the LiveKit agent - supports both Realtime and Turn-based modes"""
+    """Entry point for the LiveKit agent"""
     logger.info("=" * 60)
     logger.info(f"🎙️  Agent entrypoint called!")
     logger.info(f"   Room name: {ctx.room.name}")
-    logger.info(f"   Room SID: {ctx.room.sid}")
     logger.info(f"   Job ID: {ctx.job.id}")
     logger.info(f"   Job metadata: {ctx.job.metadata}")
     logger.info("=" * 60)
@@ -790,8 +789,10 @@ async def entrypoint(ctx: agents.JobContext):
     except Exception as e:
         logger.warning(f"Failed to parse metadata: {e}")
 
-    realtime_mode = metadata.get('realtime', False)  # Backend sends true for full Realtime, false for hybrid
     voice = metadata.get('voice', 'cartesia/sonic-3:9626c31c-bec5-4cca-baa8-f8ba9e84c8bc')
+    if not isinstance(voice, str) or not voice.strip():
+        voice = 'cartesia/sonic-3:9626c31c-bec5-4cca-baa8-f8ba9e84c8bc'
+    voice = voice.strip()
     model = metadata.get('model', 'openai/gpt-5.1-nano')
     tool_calling_enabled = metadata.get('tool_calling_enabled', True)
     web_search_enabled = metadata.get('web_search_enabled', True)
@@ -824,179 +825,94 @@ async def entrypoint(ctx: agents.JobContext):
                 logger.error(f"❌ Failed to log tool execution event: {e}")
 
     try:
-        if realtime_mode:
-            # Full OpenAI Realtime mode (audio I/O) - Pro only
-            logger.info(f"🎙️  Using OpenAI Realtime (Full Audio I/O)")
-            logger.info(f"📢 Realtime voice: {voice}")
+        # Hybrid mode: connect to third-party APIs directly (OpenAI / Anthropic / Gemini)
+        logger.info(f"💰 Using HYBRID mode: Direct LLM + {voice}")
+        logger.info(f"📢 Requested LLM model: {model}")
+        logger.info(f"📢 TTS voice: {voice}")
 
-            # Full Realtime model with audio input and output
-            realtime_model = openai.realtime.RealtimeModel(
-                voice=voice,  # OpenAI voice: alloy, echo, fable, onyx, nova, shimmer
-                temperature=0.8,
-                modalities=["text", "audio"],  # Full audio I/O
-            )
+        llm_model = create_hybrid_llm(model)
+        logger.info(f"🧠 Resolved provider: {llm_model.provider} ({llm_model.model})")
 
-            agent_session = AgentSession(llm=realtime_model)
-            agent_session.output.transcription = AssistantTranscriptSink(transcript_manager)
-
-            # Set up event handlers for transcription capture
-            # Note: Event handlers must be synchronous - use asyncio.create_task for async work
-            @agent_session.on("user_input_transcribed")
-            def on_user_transcribed(event):
-                transcript_manager.handle_user_transcript_chunk(event.transcript, event.is_final)
-
-            @agent_session.on("user_speech_committed")
-            def on_user_speech(msg: agents.llm.ChatMessage):
-                if msg:
-                    text = getattr(msg, "text_content", None)
-                    if text:
-                        logger.info(f"🗣️ Committed USER speech ({len(text)} chars) — saving turn")
-                    transcript_manager.handle_user_final_text(msg)
-
-            @agent_session.on("agent_speech_committed")
-            def on_agent_speech(msg: agents.llm.ChatMessage):
-                if msg:
-                    text = getattr(msg, "text_content", None)
-                    if text:
-                        logger.info(f"🗣️ Committed AGENT speech ({len(text)} chars) — saving turn")
-                    transcript_manager.handle_assistant_text(msg)
-
-            @agent_session.on("conversation_item_added")
-            def on_conversation_item(event):
-                try:
-                    message = getattr(event, "item", None) or event
-                    transcript_manager.handle_conversation_item(message)
-                except Exception as e:
-                    logger.error(f"❌ Error handling conversation_item_added: {e}")
-
-            # Configure room input options
-            # RoomIO (created automatically by AgentSession) handles track subscription
-            room_input_options = RoomInputOptions(close_on_disconnect=False)
-            logger.info("🎤 Starting full Realtime agent session...")
-            logger.info("   RoomIO will automatically subscribe to audio tracks")
-
-            assistant_agent = Assistant(
-                tool_calling_enabled=tool_calling_enabled,
-                web_search_enabled=web_search_enabled,
-                preferred_language_name=language_label,
-                stt_model="deepgram/nova-3",
-                stt_language=language,
-            )
-            attach_tool_logging(agent_session)
-
-            await agent_session.start(
-                room=ctx.room,
-                agent=assistant_agent,
-                room_input_options=room_input_options,
-            )
-
-            if tool_choice == "none" and agent_session._activity:
-                agent_session._activity.update_options(tool_choice="none")
-            
-            # Now that we're connected, log participants and tracks
-            logger.info("✅ Agent session started - room connected")
-            logger.info(f"🤖 Agent identity: {ctx.room.local_participant.identity if ctx.room.local_participant else 'unknown'}")
-            logger.info(f"👥 Remote participants in room: {len(ctx.room.remote_participants)}")
-            for participant in ctx.room.remote_participants.values():
-                logger.info(f"   - {participant.identity} (SID: {participant.sid})")
-                for track_pub in participant.track_publications.values():
-                    logger.info(f"     Track: {track_pub.name} ({track_pub.kind}) - subscribed: {track_pub.subscribed}")
-
-            await agent_session.generate_reply(
-                instructions=f"Greet the driver briefly in {language_label} and ask how you can help them.",
-                tool_choice=tool_choice,
-            )
-
-            logger.info("✅ Full Realtime agent session started successfully")
+        # Create TTS instance - use plugin if available (bypasses LiveKit Inference TTS limit)
+        # Otherwise fall back to LiveKit Inference
+        tts_instance = create_tts_from_voice_descriptor(voice)
+        
+        if isinstance(tts_instance, str):
+            logger.info(f"📢 Using LiveKit Inference TTS (counts against connection limit)")
         else:
-            # Hybrid mode: connect to third-party APIs directly (OpenAI / Anthropic / Gemini)
-            logger.info(f"💰 Using HYBRID mode: Direct LLM + {voice}")
-            logger.info(f"📢 Requested LLM model: {model}")
-            logger.info(f"📢 TTS voice: {voice}")
+            logger.info(f"📢 Using TTS plugin directly (does NOT count against LiveKit Inference limit)")
 
-            llm_model = create_hybrid_llm(model)
-            logger.info(f"🧠 Resolved provider: {llm_model.provider} ({llm_model.model})")
+        # AgentSession with LiveKit Inference LLM + TTS (plugin or Inference)
+        agent_session = AgentSession(
+            llm=llm_model,  # OpenAI chat completion model (plugin)
+            tts=tts_instance,  # TTS plugin instance or LiveKit Inference descriptor
+            stt=inference.STT.from_model_string(f"deepgram/nova-3:{language}"),
+        )
+        agent_session.output.transcription = AssistantTranscriptSink(transcript_manager)
 
-            # Create TTS instance - use plugin if available (bypasses LiveKit Inference TTS limit)
-            # Otherwise fall back to LiveKit Inference
-            tts_instance = create_tts_from_voice_descriptor(voice)
-            
-            if isinstance(tts_instance, str):
-                logger.info(f"📢 Using LiveKit Inference TTS (counts against connection limit)")
-            else:
-                logger.info(f"📢 Using TTS plugin directly (does NOT count against LiveKit Inference limit)")
+        # Set up event handlers for transcription capture
+        # Note: Event handlers must be synchronous - use asyncio.create_task for async work
+        @agent_session.on("user_input_transcribed")
+        def on_user_transcribed(event):
+            transcript_manager.handle_user_transcript_chunk(event.transcript, event.is_final)
 
-            # AgentSession with LiveKit Inference LLM + TTS (plugin or Inference)
-            agent_session = AgentSession(
-                llm=llm_model,  # OpenAI chat completion model (plugin)
-                tts=tts_instance,  # TTS plugin instance or LiveKit Inference descriptor
-                stt=inference.STT.from_model_string(f"deepgram/nova-3:{language}"),
-            )
-            agent_session.output.transcription = AssistantTranscriptSink(transcript_manager)
+        @agent_session.on("user_speech_committed")
+        def on_user_speech(msg: agents.llm.ChatMessage):
+            if msg:
+                transcript_manager.handle_user_final_text(msg)
 
-            # Set up event handlers for transcription capture
-            # Note: Event handlers must be synchronous - use asyncio.create_task for async work
-            @agent_session.on("user_input_transcribed")
-            def on_user_transcribed(event):
-                transcript_manager.handle_user_transcript_chunk(event.transcript, event.is_final)
+        @agent_session.on("agent_speech_committed")
+        def on_agent_speech(msg: agents.llm.ChatMessage):
+            if msg:
+                transcript_manager.handle_assistant_text(msg)
 
-            @agent_session.on("user_speech_committed")
-            def on_user_speech(msg: agents.llm.ChatMessage):
-                if msg:
-                    transcript_manager.handle_user_final_text(msg)
+        @agent_session.on("conversation_item_added")
+        def on_conversation_item(event):
+            try:
+                message = getattr(event, "item", None) or event
+                transcript_manager.handle_conversation_item(message)
+            except Exception as e:
+                logger.error(f"❌ Error handling conversation_item_added: {e}")
 
-            @agent_session.on("agent_speech_committed")
-            def on_agent_speech(msg: agents.llm.ChatMessage):
-                if msg:
-                    transcript_manager.handle_assistant_text(msg)
+        # Configure room input options
+        # RoomIO (created automatically by AgentSession) handles track subscription
+        room_input_options = RoomInputOptions(close_on_disconnect=False)
+        logger.info("🎤 Starting hybrid agent session...")
+        logger.info("   RoomIO will automatically subscribe to audio tracks")
 
-            @agent_session.on("conversation_item_added")
-            def on_conversation_item(event):
-                try:
-                    message = getattr(event, "item", None) or event
-                    transcript_manager.handle_conversation_item(message)
-                except Exception as e:
-                    logger.error(f"❌ Error handling conversation_item_added: {e}")
+        assistant_agent = Assistant(
+            tool_calling_enabled=tool_calling_enabled,
+            web_search_enabled=web_search_enabled,
+            preferred_language_name=language_label,
+            stt_model="deepgram/nova-3",
+            stt_language=language,
+        )
+        attach_tool_logging(agent_session)
 
-            # Configure room input options
-            # RoomIO (created automatically by AgentSession) handles track subscription
-            room_input_options = RoomInputOptions(close_on_disconnect=False)
-            logger.info("🎤 Starting hybrid agent session...")
-            logger.info("   RoomIO will automatically subscribe to audio tracks")
+        await agent_session.start(
+            room=ctx.room,
+            agent=assistant_agent,
+            room_input_options=room_input_options,
+        )
 
-            assistant_agent = Assistant(
-                tool_calling_enabled=tool_calling_enabled,
-                web_search_enabled=web_search_enabled,
-                preferred_language_name=language_label,
-                stt_model="deepgram/nova-3",
-                stt_language=language,
-            )
-            attach_tool_logging(agent_session)
+        if tool_choice == "none" and agent_session._activity:
+            agent_session._activity.update_options(tool_choice="none")
+        
+        # Now that we're connected, log participants and tracks
+        logger.info("✅ Agent session started - room connected")
+        logger.info(f"🤖 Agent identity: {ctx.room.local_participant.identity if ctx.room.local_participant else 'unknown'}")
+        logger.info(f"👥 Remote participants in room: {len(ctx.room.remote_participants)}")
+        for participant in ctx.room.remote_participants.values():
+            logger.info(f"   - {participant.identity} (SID: {participant.sid})")
+            for track_pub in participant.track_publications.values():
+                logger.info(f"     Track: {track_pub.name} ({track_pub.kind}) - subscribed: {track_pub.subscribed}")
 
-            await agent_session.start(
-                room=ctx.room,
-                agent=assistant_agent,
-                room_input_options=room_input_options,
-            )
+        await agent_session.generate_reply(
+            instructions=f"Greet the driver briefly in {language_label} and ask how you can help them.",
+            tool_choice=tool_choice,
+        )
 
-            if tool_choice == "none" and agent_session._activity:
-                agent_session._activity.update_options(tool_choice="none")
-            
-            # Now that we're connected, log participants and tracks
-            logger.info("✅ Hybrid agent session started - room connected")
-            logger.info(f"🤖 Agent identity: {ctx.room.local_participant.identity if ctx.room.local_participant else 'unknown'}")
-            logger.info(f"👥 Remote participants in room: {len(ctx.room.remote_participants)}")
-            for participant in ctx.room.remote_participants.values():
-                logger.info(f"   - {participant.identity} (SID: {participant.sid})")
-                for track_pub in participant.track_publications.values():
-                    logger.info(f"     Track: {track_pub.name} ({track_pub.kind}) - subscribed: {track_pub.subscribed}")
-
-            await agent_session.generate_reply(
-                instructions=f"Greet the driver briefly in {language_label} and ask how you can help them.",
-                tool_choice=tool_choice,
-            )
-
-            logger.info("✅ Hybrid agent session started successfully")
+        logger.info("✅ Hybrid agent session started successfully")
 
     except Exception as e:
         logger.error(f"❌ Agent error: {e}")
@@ -1023,7 +939,7 @@ if __name__ == "__main__":
     try:
         # Start the agent worker with explicit dispatch support
         # IMPORTANT: agent_name must match the name used in dispatchAgentToRoom() in livekit.js
-        # This is "agent" for Railway/local workers, or "shaw-voice-assistant" for LiveKit Cloud deployment
+        # This is "agent" for Railway/local workers, or "roadtrip-voice-assistant" for LiveKit Cloud deployment
         agent_name = os.getenv("LIVEKIT_AGENT_NAME", "agent")
         logger.info(f"📋 Agent name for dispatch: {agent_name}")
         logger.info(f"   This must match the agent name used in dispatchAgentToRoom()")

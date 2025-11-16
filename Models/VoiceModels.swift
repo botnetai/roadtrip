@@ -1,6 +1,6 @@
 //
 //  VoiceModels.swift
-//  Shaw
+//  Roadtrip
 //
 
 import Foundation
@@ -8,13 +8,11 @@ import Foundation
 enum TTSProvider: String, Codable, CaseIterable {
     case cartesia
     case elevenlabs
-    case openaiRealtime
 
     var displayName: String {
         switch self {
         case .cartesia: return "Cartesia"
         case .elevenlabs: return "ElevenLabs"
-        case .openaiRealtime: return "OpenAI Realtime"
         }
     }
 }
@@ -114,10 +112,6 @@ struct TTSVoice: Identifiable, Codable, Equatable {
             return mapped
         }
 
-        if provider == .openaiRealtime {
-            return "openai-\(voiceID)"
-        }
-
         return voiceID
             .replacingOccurrences(of: "/", with: "-")
             .replacingOccurrences(of: ":", with: "-")
@@ -159,20 +153,10 @@ struct TTSVoice: Identifiable, Codable, Equatable {
         TTSVoice(id: "elevenlabs/eleven_turbo_v2_5:ZQe5CZNOzWyzPSCn5a3c", name: "Javier", description: "Experto latino confiable", provider: .elevenlabs, requiresPro: false, language: .spanish, previewIdentifier: "elevenlabs-javier")
     ]
 
-    static let openaiRealtimeVoices: [TTSVoice] = [
-        TTSVoice(id: "alloy", name: "Alloy", description: "Neutral balanced voice", provider: .openaiRealtime, requiresPro: true, language: .english, previewIdentifier: "openai-alloy"),
-        TTSVoice(id: "echo", name: "Echo", description: "Warm friendly voice", provider: .openaiRealtime, requiresPro: true, language: .english, previewIdentifier: "openai-echo"),
-        TTSVoice(id: "fable", name: "Fable", description: "Expressive storytelling voice", provider: .openaiRealtime, requiresPro: true, language: .english, previewIdentifier: "openai-fable"),
-        TTSVoice(id: "onyx", name: "Onyx", description: "Deep authoritative voice", provider: .openaiRealtime, requiresPro: true, language: .english, previewIdentifier: "openai-onyx"),
-        TTSVoice(id: "nova", name: "Nova", description: "Clear energetic voice", provider: .openaiRealtime, requiresPro: true, language: .english, previewIdentifier: "openai-nova"),
-        TTSVoice(id: "shimmer", name: "Shimmer", description: "Soft soothing voice", provider: .openaiRealtime, requiresPro: true, language: .english, previewIdentifier: "openai-shimmer")
-    ]
-
     static func voices(for provider: TTSProvider, language: VoiceLanguage? = nil) -> [TTSVoice] {
         switch provider {
         case .cartesia: return filter(voices: cartesiaVoices, language: language)
         case .elevenlabs: return filter(voices: elevenlabsVoices, language: language)
-        case .openaiRealtime: return filter(voices: openaiRealtimeVoices, language: language)
         }
     }
 
@@ -185,7 +169,7 @@ struct TTSVoice: Identifiable, Codable, Equatable {
     }
 
     static var allVoices: [TTSVoice] {
-        cartesiaVoices + elevenlabsVoices + openaiRealtimeVoices
+        cartesiaVoices + elevenlabsVoices
     }
 
     static func language(for voiceID: String) -> VoiceLanguage? {
@@ -198,10 +182,6 @@ struct TTSVoice: Identifiable, Codable, Equatable {
     }
 
     static let `default` = cartesiaVoices.first(where: { $0.language == .english }) ?? cartesiaVoices[0]
-
-    var isRealtimeMode: Bool {
-        return provider == .openaiRealtime
-    }
 }
 
 enum AIModelProvider: String, Codable, CaseIterable {
@@ -209,7 +189,6 @@ enum AIModelProvider: String, Codable, CaseIterable {
     case anthropic
     case google
     case xai
-    case other
 
     var displayName: String {
         switch self {
@@ -217,7 +196,6 @@ enum AIModelProvider: String, Codable, CaseIterable {
         case .anthropic: return "Anthropic"
         case .google: return "Google"
         case .xai: return "xAI"
-        case .other: return "Other"
         }
     }
 }
