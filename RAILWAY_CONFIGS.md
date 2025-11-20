@@ -2,47 +2,54 @@
 
 ## Current Setup
 
-We deploy from the **repo root** with Root Directory = `.` in Railway dashboard.
+The project now deploys **two Railway services** from the same GitHub repo:
 
-### Main Service (Node.js + Python Agent)
+1. **Node service** – API only (no embedded agent)
+   - **Config file**: `railway-node.json`
+   - **Root dir**: `backend`
+   - **Start command**: `cd backend && npm start`
+   - **Build plan**: `backend/nixpacks.toml`
 
-**File**: `railway.json` (at repo root)
-- **Purpose**: Combined service running both Node.js server and Python agent
-- **Start Command**: `bash start.sh` (wrapper that calls `backend/start.sh`)
-- **Build Config**: `nixpacks.toml` (at repo root)
+2. **Python service** – Dedicated LiveKit agent worker
+   - **Config file**: `railway-python.json`
+   - **Root dir**: `backend`
+   - **Start command**: `cd backend && bash start-agent.sh`
+   - **Build plan**: `backend/nixpacks-agent.toml`
 
-### Python-Only Service (If Needed in Future)
+### Legacy combined service
 
-**Files**: `backend/start-agent.sh` and `backend/nixpacks-agent.toml`
-- **Purpose**: If you create a separate Railway service that runs ONLY the Python agent
-- **Start Command**: `bash start-agent.sh`
-- **Build Config**: `backend/nixpacks-agent.toml`
-- **Note**: Configure these settings directly in Railway dashboard if creating a separate service
+`railway.json` is kept for reference/testing (it still launches the combined Node + agent stack via `bash start.sh`). New deployments should use the service-specific config files above.
 
 ## File Structure
 
 ```
-roadtrip-app/
-├── railway.json              ← Main service config (Node.js + Python)
-├── nixpacks.toml             ← Main service build config
-├── start.sh                  ← Wrapper script (calls backend/start.sh)
+roadtrip/
+├── railway.json              ← Legacy combined config (unused in split setup)
+├── railway-node.json         ← Node service config-as-code
+├── railway-python.json       ← Python agent config-as-code
+├── start.sh                  ← Wrapper (combined mode only)
 └── backend/
-    ├── start.sh              ← Actual startup script
-    ├── start-agent.sh        ← Python-only startup script (if needed)
-    └── nixpacks-agent.toml   ← Python-only build config (if needed)
+    ├── start.sh              ← Combined-mode launcher
+    ├── start-agent.sh        ← Python-only launcher
+    ├── nixpacks.toml         ← Node build plan
+    └── nixpacks-agent.toml   ← Python build plan
 ```
 
 ## Railway Dashboard Settings
 
-### Main Service
-- **Root Directory**: `.` (root)
-- **Nixpacks Config Path**: `nixpacks.toml` (or leave empty, Railway will find it)
-- **Start Command**: `bash start.sh` (or leave empty, uses railway.json)
-
-### Python Service (if separate)
+### Node service
+- **Config file**: `railway-node.json`
 - **Root Directory**: `backend`
-- **Nixpacks Config Path**: `nixpacks-agent.toml`
-- **Start Command**: `bash start-agent.sh`
+- **Nixpacks Config Path**: `backend/nixpacks.toml`
+- **Start Command**: `cd backend && npm start`
+- **Env**: add `DISABLE_EMBEDDED_AGENT=1` plus LiveKit/OpenAI/DB secrets
+
+### Python service
+- **Config file**: `railway-python.json`
+- **Root Directory**: `backend`
+- **Nixpacks Config Path**: `backend/nixpacks-agent.toml`
+- **Start Command**: `cd backend && bash start-agent.sh`
+- **Env**: LiveKit + OpenAI + Cartesia + ElevenLabs (+ optional LLM keys)
 
 ## Why This Structure?
 
@@ -53,6 +60,6 @@ roadtrip-app/
 
 ## Removed Files
 
-- ~~`backend/railway.json`~~ - Removed, no longer needed (replaced by root `railway.json`)
-- ~~`backend/railway-agent.json`~~ - Removed, not needed (configure Python service directly in dashboard if needed)
+- ~~`backend/railway.json`~~ - superseded by `railway-node.json`
+- ~~`backend/railway-agent.json`~~ - superseded by `railway-python.json`
 

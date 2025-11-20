@@ -90,3 +90,7 @@ fastlane/test_output
 iOSInjectionProject/
 
 .DS_Store
+
+# Railway exports
+backend-service-vars.json
+python-service-vars.json
