@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 # Verify required environment variables
 def verify_env():
-    """Verify that required environment variables are set"""
+    """Verify that required environment variables are set and log TTS/LLM keys."""
     required_vars = {
         'LIVEKIT_URL': os.getenv('LIVEKIT_URL'),
         'LIVEKIT_API_KEY': os.getenv('LIVEKIT_API_KEY'),
@@ -55,11 +55,15 @@ def verify_env():
     perplexity = os.getenv('PERPLEXITY_API_KEY')
     anthropic = os.getenv('ANTHROPIC_API_KEY')
     gemini = os.getenv('GEMINI_API_KEY')
+    openai_key = os.getenv('OPENAI_API_KEY')
     logger.info(f"   CARTESIA_API_KEY: {cartesia[:6] + '...' if cartesia else 'not set'}")
     logger.info(f"   ELEVENLABS_API_KEY: {eleven[:6] + '...' if eleven else 'not set'}")
     logger.info(f"   PERPLEXITY_API_KEY: {perplexity[:6] + '...' if perplexity else 'not set'}")
     logger.info(f"   ANTHROPIC_API_KEY: {anthropic[:6] + '...' if anthropic else 'not set'}")
     logger.info(f"   GEMINI_API_KEY: {gemini[:6] + '...' if gemini else 'not set'}")
+    logger.info(f"   OPENAI_API_KEY: {openai_key[:6] + '...' if openai_key else 'not set'}")
+    if not openai_key:
+        logger.error("❌ OPENAI_API_KEY is required for LLM responses and is not set.")
     return True
 
 # Backend API configuration
@@ -826,6 +830,8 @@ async def entrypoint(ctx: agents.JobContext):
 
     logger.info(f"🔧 Tool settings - Tool calling: {tool_calling_enabled}, Web search: {web_search_enabled}")
     logger.info(f"🌐 STT language: {language} ({language_label})")
+    logger.info(f"🗣️  Requested voice: {voice}")
+    logger.info(f"🧠 Requested LLM model: {model}")
     if tool_calling_enabled and web_search_enabled and not os.getenv('PERPLEXITY_API_KEY'):
         logger.warning("⚠️  web_search tool enabled but PERPLEXITY_API_KEY is missing - tool calls will fail")
     transcript_manager = TranscriptManager(session_id)
@@ -931,10 +937,17 @@ async def entrypoint(ctx: agents.JobContext):
             for track_pub in participant.track_publications.values():
                 logger.info(f"     Track: {track_pub.name} ({track_pub.kind}) - subscribed: {track_pub.subscribed}")
 
-        await agent_session.generate_reply(
-            instructions=f"Greet the driver briefly in {language_label} and ask how you can help them.",
-            tool_choice=tool_choice,
-        )
+        try:
+            logger.info("💬 Generating initial reply (greeting)...")
+            await agent_session.generate_reply(
+                instructions=f"Greet the driver briefly in {language_label} and ask how you can help them.",
+                tool_choice=tool_choice,
+            )
+            logger.info("✅ Initial reply generated")
+        except Exception as gen_err:
+            logger.error(f"❌ Failed to generate initial reply: {gen_err}")
+            # Re-raise to bubble up so we can see this failure in logs/dispatch
+            raise
 
         logger.info("✅ Hybrid agent session started successfully")
 
