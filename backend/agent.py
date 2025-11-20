@@ -17,7 +17,7 @@ from livekit.agents import utils as agent_utils
 from livekit.agents.inference.llm import to_fnc_ctx
 from livekit.agents.types import DEFAULT_API_CONNECT_OPTIONS, NOT_GIVEN
 from livekit.agents._exceptions import APIConnectionError, APIStatusError
-from livekit.plugins import openai, cartesia
+from livekit.plugins import openai, cartesia, elevenlabs
 
 # Load environment variables from .env file
 load_dotenv()
@@ -723,8 +723,26 @@ def create_tts_from_voice_descriptor(voice_descriptor: str):
             return voice_descriptor
     
     if voice_descriptor.startswith("elevenlabs/"):
-        # Fallback to LiveKit Inference for ElevenLabs
-        return voice_descriptor
+        # Parse ElevenLabs format: "elevenlabs/eleven_turbo_v2_5:voice-id"
+        try:
+            parts = voice_descriptor.split(":", 1)
+            if len(parts) == 2:
+                model_part = parts[0]  # "elevenlabs/eleven_turbo_v2_5"
+                voice_id = parts[1]
+                model = model_part.split("/")[-1] if "/" in model_part else "eleven_turbo_v2_5"
+
+                if os.getenv("ELEVENLABS_API_KEY"):
+                    logger.info("🎤 Using ElevenLabs plugin directly (bypasses LiveKit Inference TTS limit)")
+                    return elevenlabs.TTS(model=model, voice=voice_id)
+                else:
+                    logger.warning("⚠️  ELEVENLABS_API_KEY not set, falling back to LiveKit Inference")
+                    return voice_descriptor
+            else:
+                logger.warning(f"⚠️  Invalid ElevenLabs voice format: {voice_descriptor}")
+                return voice_descriptor
+        except Exception as e:
+            logger.error(f"❌ Error creating ElevenLabs TTS: {e}")
+            return voice_descriptor
 
     return voice_descriptor
 
