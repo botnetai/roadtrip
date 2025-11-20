@@ -7,13 +7,13 @@ The project now deploys **two Railway services** from the same GitHub repo:
 1. **Node service** – API only (no embedded agent)
    - **Config file**: `railway-node.json`
    - **Root dir**: `backend`
-   - **Start command**: `cd backend && npm start`
+   - **Start command**: `npm start` (root dir is already `backend`)
    - **Build plan**: `backend/nixpacks.toml`
 
 2. **Python service** – Dedicated LiveKit agent worker
    - **Config file**: `railway-python.json`
    - **Root dir**: `backend`
-   - **Start command**: `cd backend && bash start-agent.sh`
+   - **Start command**: `bash start-agent.sh` (root dir is already `backend`)
    - **Build plan**: `backend/nixpacks-agent.toml`
 
 ### Legacy combined service
@@ -41,14 +41,14 @@ roadtrip/
 - **Config file**: `railway-node.json`
 - **Root Directory**: `backend`
 - **Nixpacks Config Path**: `backend/nixpacks.toml`
-- **Start Command**: `cd backend && npm start`
+- **Start Command**: `npm start`
 - **Env**: add `DISABLE_EMBEDDED_AGENT=1` plus LiveKit/OpenAI/DB secrets
 
 ### Python service
 - **Config file**: `railway-python.json`
 - **Root Directory**: `backend`
 - **Nixpacks Config Path**: `backend/nixpacks-agent.toml`
-- **Start Command**: `cd backend && bash start-agent.sh`
+- **Start Command**: `bash start-agent.sh`
 - **Env**: LiveKit + OpenAI + Cartesia + ElevenLabs (+ optional LLM keys)
 
 ## Why This Structure?
@@ -62,4 +62,3 @@ roadtrip/
 
 - ~~`backend/railway.json`~~ - superseded by `railway-node.json`
 - ~~`backend/railway-agent.json`~~ - superseded by `railway-python.json`
-

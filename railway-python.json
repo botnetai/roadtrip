@@ -5,9 +5,8 @@
     "nixpacksConfigPath": "backend/nixpacks-agent.toml"
   },
   "deploy": {
-    "startCommand": "cd backend && bash start-agent.sh",
+    "startCommand": "bash start-agent.sh",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10
   }
 }
-
