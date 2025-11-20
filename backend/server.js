@@ -472,10 +472,22 @@ app.get('/health/agent', async (req, res) => {
         if (rooms && rooms.length > 0) {
           // Get the most recent room
           const recentRoom = rooms[0];
+
+          // LiveKit SDK returns BigInt timestamps; convert safely to ISO string
+          const createdAtMsRaw = recentRoom.creationTimeMs ?? (recentRoom.creationTime ? BigInt(recentRoom.creationTime) * 1000n : null);
+          let createdAtIso = null;
+          if (createdAtMsRaw !== null && createdAtMsRaw !== undefined) {
+            try {
+              createdAtIso = new Date(Number(createdAtMsRaw)).toISOString();
+            } catch (err) {
+              console.error('⚠️  Failed to convert room creation time:', err.message);
+            }
+          }
+
           lastRoomActivity = {
             room_name: recentRoom.name,
             num_participants: recentRoom.numParticipants || 0,
-            created_at: recentRoom.creationTime ? new Date(recentRoom.creationTime * 1000).toISOString() : null
+            created_at: createdAtIso
           };
         }
 

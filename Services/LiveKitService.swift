@@ -124,4 +124,16 @@ extension LiveKitService: RoomDelegate {
             }
         }
     }
+
+    nonisolated func room(_ room: Room, participantDidConnect participant: RemoteParticipant) {
+        let identity = participant.identity.map { "\($0)" } ?? "unknown"
+        let sid = participant.sid.map { "\($0)" } ?? "unknown"
+        print("👤 Remote participant joined: \(identity) (SID: \(sid))")
+    }
+
+    nonisolated func room(_ room: Room, participantDidDisconnect participant: RemoteParticipant) {
+        let identity = participant.identity.map { "\($0)" } ?? "unknown"
+        let sid = participant.sid.map { "\($0)" } ?? "unknown"
+        print("👋 Remote participant left: \(identity) (SID: \(sid))")
+    }
 }
