@@ -409,51 +409,34 @@ struct MicrophoneActivityView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .center, spacing: 12) {
-                Image(systemName: "waveform.circle.fill")
-                    .font(.system(size: 34))
+                Image(systemName: "mic.fill")
+                    .font(.system(size: 24))
                     .foregroundColor(.blue)
+                    .padding(10)
+                    .background(Color.blue.opacity(0.1))
+                    .clipShape(Circle())
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(monitor.isMonitoring ? "Microphone is live" : "Starting microphone…")
+                    Text(monitor.isMonitoring ? "Listening..." : "Connecting...")
                         .font(.headline)
                         .foregroundColor(.primary)
-                    Text("Speak naturally—your assistant is listening.")
+                    Text("Speak naturally")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
                 Spacer()
+                
+                AudioVisualizerView(level: monitor.level)
             }
-
-            ZStack {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.blue.opacity(0.15),
-                                Color.cyan.opacity(0.08)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .stroke(Color.white.opacity(0.25))
-                    )
-
-                MicrophoneWaveformCanvas(level: monitor.level)
-                    .padding(.horizontal, 6)
-            }
-            .frame(height: 70)
         }
-        .padding(24)
+        .padding(20)
         .frame(maxWidth: .infinity)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 32, style: .continuous))
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 32, style: .continuous)
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
                 .stroke(Color.blue.opacity(0.1))
         )
-        .shadow(color: Color.black.opacity(0.08), radius: 20, x: 0, y: 12)
+        .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 4)
         .onAppear {
             monitor.startMonitoring()
         }
@@ -466,93 +449,64 @@ struct MicrophoneActivityView: View {
     }
 }
 
-struct MicrophoneWaveformCanvas: View {
+struct AudioVisualizerView: View {
     var level: CGFloat
-
+    
+    // Configuration
+    private let barCount = 5
+    private let spacing: CGFloat = 6
+    private let minHeight: CGFloat = 12
+    private let maxHeight: CGFloat = 50
+    
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 45.0)) { timeline in
-            let time = timeline.date.timeIntervalSinceReferenceDate
-            Canvas { context, size in
-                drawBackground(in: &context, size: size)
-                drawWaves(in: &context, size: size, time: time)
+        HStack(spacing: spacing) {
+            ForEach(0..<barCount, id: \.self) { index in
+                VisualizerBar(
+                    index: index,
+                    level: level,
+                    totalBars: barCount,
+                    minHeight: minHeight,
+                    maxHeight: maxHeight
+                )
             }
         }
+        .frame(height: maxHeight)
     }
+}
 
-    private func drawBackground(in context: inout GraphicsContext, size: CGSize) {
-        let path = Path(roundedRect: CGRect(origin: .zero, size: size), cornerRadius: 16)
-        context.fill(
-            path,
-            with: .linearGradient(
-                Gradient(colors: [Color.white.opacity(0.08), Color.white.opacity(0.02)]),
-                startPoint: CGPoint(x: 0, y: 0),
-                endPoint: CGPoint(x: 0, y: size.height)
+struct VisualizerBar: View {
+    let index: Int
+    let level: CGFloat
+    let totalBars: Int
+    let minHeight: CGFloat
+    let maxHeight: CGFloat
+    
+    var body: some View {
+        RoundedRectangle(cornerRadius: 4)
+            .fill(Color.blue)
+            .frame(width: 6, height: height)
+            .animation(
+                .easeInOut(duration: 0.15)
+                .repeatForever(autoreverses: true)
+                .delay(Double(index) * 0.05),
+                value: level
             )
-        )
     }
-
-    private func drawWaves(in context: inout GraphicsContext, size: CGSize, time: TimeInterval) {
-        let normalized = max(0.08, level)
-        let baseAmplitude = normalized * (size.height / 2.0)
-
-        let waves: [Wave] = [
-            Wave(multiplier: 1.0, frequency: 2.2, speed: 1.6, lineWidth: 3, phaseOffset: 0, color: Color.blue),
-            Wave(multiplier: 0.65, frequency: 3.4, speed: 1.1, lineWidth: 2.2, phaseOffset: .pi / 2, color: Color.cyan),
-            Wave(multiplier: 0.35, frequency: 4.6, speed: 0.9, lineWidth: 1.3, phaseOffset: .pi, color: Color.blue.opacity(0.6))
-        ]
-
-        for wave in waves {
-            let amplitude = max(1, baseAmplitude * wave.multiplier)
-            let phase = CGFloat(time) * wave.speed + wave.phaseOffset
-            let path = wavePath(size: size, amplitude: amplitude, phase: phase, frequency: wave.frequency)
-            let shading = GraphicsContext.Shading.linearGradient(
-                Gradient(colors: [
-                    wave.color.opacity(0.9),
-                    wave.color.opacity(0.4)
-                ]),
-                startPoint: CGPoint(x: 0, y: 0),
-                endPoint: CGPoint(x: size.width, y: size.height)
-            )
-
-            context.stroke(
-                path,
-                with: shading,
-                style: StrokeStyle(
-                    lineWidth: wave.lineWidth,
-                    lineCap: .round,
-                    lineJoin: .round
-                )
-            )
-        }
-    }
-
-    private func wavePath(size: CGSize, amplitude: CGFloat, phase: CGFloat, frequency: CGFloat) -> Path {
-        var path = Path()
-        let width = size.width
-        let midY = size.height / 2
-        let step = max(1, width / 90)
-
-        path.move(to: CGPoint(x: 0, y: midY))
-
-        var x: CGFloat = 0
-        while x <= width {
-            let progress = x / width
-            let angle = progress * frequency * .pi * 2 + phase
-            let y = midY + sin(angle) * amplitude
-            path.addLine(to: CGPoint(x: x, y: y))
-            x += step
-        }
-
-        return path
-    }
-
-    private struct Wave {
-        let multiplier: CGFloat
-        let frequency: CGFloat
-        let speed: CGFloat
-        let lineWidth: CGFloat
-        let phaseOffset: CGFloat
-        let color: Color
+    
+    private var height: CGFloat {
+        // Create a symmetric wave pattern centered on the middle bar
+        let center = Double(totalBars - 1) / 2.0
+        let distanceFromCenter = abs(Double(index) - center)
+        let normalizedDistance = 1.0 - (distanceFromCenter / center)
+        
+        // Calculate dynamic height based on audio level
+        // Use the normalized distance to make center bars taller
+        let dynamicLevel = max(0.1, Double(level))
+        let randomVariation = Double.random(in: 0.8...1.2)
+        
+        let calculatedHeight = minHeight + (maxHeight - minHeight) * dynamicLevel * normalizedDistance * randomVariation
+        
+        return max(minHeight, min(maxHeight, calculatedHeight))
     }
 }
 
