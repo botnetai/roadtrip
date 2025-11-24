@@ -57,6 +57,13 @@ struct SignInScreen: View {
             }
             .padding(.horizontal)
 
+            HStack(spacing: 16) {
+                Link("Terms of Use", destination: URL(string: "https://botnet.com/terms")!)
+                Link("Privacy Policy", destination: URL(string: "https://botnet.com/privacy")!)
+            }
+            .font(.caption)
+            .foregroundColor(.secondary)
+
             Spacer()
         }
         .padding()

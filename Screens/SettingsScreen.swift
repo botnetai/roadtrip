@@ -56,6 +56,7 @@ struct SettingsScreen: View {
             cloudBackupSection
             assistantCapabilitiesSection
             dataRetentionSection
+            legalSection
         }
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.large)
@@ -474,6 +475,16 @@ struct SettingsScreen: View {
             }
         } footer: {
             Text("This will permanently delete your account and all associated data.")
+        }
+    }
+
+    @ViewBuilder
+    private var legalSection: some View {
+        Section {
+            Link("Terms of Use", destination: URL(string: "https://botnet.com/terms")!)
+            Link("Privacy Policy", destination: URL(string: "https://botnet.com/privacy")!)
+        } header: {
+            Text("Legal")
         }
     }
 
