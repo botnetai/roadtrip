@@ -82,24 +82,27 @@ struct PaywallView: View {
                     .padding(.top, 8)
 
                     // Legal footer
-                    VStack(spacing: 8) {
-                        HStack(spacing: 16) {
-                            Button("Terms of Service") {
-                                openURL("https://roadtrip.ai/terms")
-                            }
-                            .font(.caption)
-
-                            Button("Privacy Policy") {
-                                openURL("https://roadtrip.ai/privacy")
-                            }
-                            .font(.caption)
-                        }
-
-                        Text("Subscriptions auto-renew unless cancelled. Cancel anytime in App Store settings.")
-                            .font(.caption)
+                    VStack(spacing: 12) {
+                        Text("Subscriptions automatically renew unless auto-renew is turned off at least 24 hours before the end of the current period. Your Apple ID account will be charged for renewal within 24 hours prior to the end of the current period. You can manage and cancel your subscriptions in your App Store account settings.")
+                            .font(.caption2)
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
                             .padding(.horizontal)
+
+                        HStack(spacing: 16) {
+                            Button("Terms of Use") {
+                                openURL("https://botnet.com/terms")
+                            }
+                            .font(.caption)
+
+                            Text("•")
+                                .foregroundColor(.secondary)
+
+                            Button("Privacy Policy") {
+                                openURL("https://botnet.com/privacy")
+                            }
+                            .font(.caption)
+                        }
                     }
                     .padding(.bottom, 32)
                 }
