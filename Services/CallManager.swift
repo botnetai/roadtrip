@@ -40,7 +40,9 @@ class CallManager: NSObject {
     // Dependency injection for testing
     init(provider: CXProviderProtocol? = nil, callController: CXCallControllerProtocol? = nil) {
         // CallKit is not supported on iPad - detect device type
-        self.isCallKitSupported = UIDevice.current.userInterfaceIdiom == .phone
+        // CarPlay uses CallKit, so treat it as supported alongside phone
+        let idiom = UIDevice.current.userInterfaceIdiom
+        self.isCallKitSupported = idiom == .phone || idiom == .carPlay
 
         if let provider = provider, let callController = callController {
             // Test initialization
