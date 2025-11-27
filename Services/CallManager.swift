@@ -6,6 +6,7 @@
 import Foundation
 import CallKit
 import AVFoundation
+import UIKit
 
 protocol CallManagerDelegate: AnyObject {
     func callManagerDidConnect()
@@ -21,49 +22,67 @@ class CallManager: NSObject {
         }
         return _shared!
     }
-    
+
     // Allow resetting shared instance for testing
     static func resetShared() {
         _shared = nil
     }
-    
+
     weak var delegate: CallManagerDelegate?
-    
-    private let provider: CXProviderProtocol
-    private let callController: CXCallControllerProtocol
+
+    private let provider: CXProviderProtocol?
+    private let callController: CXCallControllerProtocol?
     private var currentCallUUID: UUID?
-    
+
+    /// iPad doesn't support CallKit, so we bypass it entirely on iPad
+    private let isCallKitSupported: Bool
+
     // Dependency injection for testing
     init(provider: CXProviderProtocol? = nil, callController: CXCallControllerProtocol? = nil) {
+        // CallKit is not supported on iPad - detect device type
+        self.isCallKitSupported = UIDevice.current.userInterfaceIdiom == .phone
+
         if let provider = provider, let callController = callController {
             // Test initialization
             self.provider = provider
             self.callController = callController
-        } else {
-            // Production initialization
+        } else if isCallKitSupported {
+            // Production initialization for iPhone
             let configuration = CXProviderConfiguration()
             configuration.supportsVideo = false
             configuration.maximumCallsPerCallGroup = 1
             configuration.supportedHandleTypes = [.generic]
             configuration.iconTemplateImageData = nil
-            
+
             self.provider = CXProvider(configuration: configuration)
             self.callController = CXCallController()
+        } else {
+            // iPad - no CallKit
+            self.provider = nil
+            self.callController = nil
         }
-        
+
         super.init()
-        
-        self.provider.setDelegate(self, queue: nil)
+
+        self.provider?.setDelegate(self, queue: nil)
     }
-    
+
     func startAssistantCall() {
+        // On iPad, bypass CallKit entirely
+        guard isCallKitSupported else {
+            currentCallUUID = UUID()
+            configureAudioSession()
+            delegate?.callManagerDidConnect()
+            return
+        }
+
         let handle = CXHandle(type: .generic, value: "AI Assistant")
         let startCallAction = CXStartCallAction(call: UUID(), handle: handle)
         startCallAction.isVideo = false
-        
+
         let transaction = CXTransaction(action: startCallAction)
-        
-        callController.request(transaction) { [weak self] error in
+
+        callController?.request(transaction) { [weak self] error in
             if let error = error {
                 print("Error starting call: \(error)")
                 self?.delegate?.callManagerDidFail(error: error)
@@ -75,16 +94,24 @@ class CallManager: NSObject {
 
     func reportCallConnected() {
         guard let uuid = currentCallUUID else { return }
-        provider.reportOutgoingCall(with: uuid, connectedAt: Date())
+        provider?.reportOutgoingCall(with: uuid, connectedAt: Date())
     }
-    
+
     func endCurrentCall() {
         guard let callUUID = currentCallUUID else { return }
-        
+
+        // On iPad, bypass CallKit entirely
+        guard isCallKitSupported else {
+            deactivateAudioSession()
+            currentCallUUID = nil
+            delegate?.callManagerDidDisconnect()
+            return
+        }
+
         let endCallAction = CXEndCallAction(call: callUUID)
         let transaction = CXTransaction(action: endCallAction)
-        
-        callController.request(transaction) { error in
+
+        callController?.request(transaction) { error in
             if let error = error {
                 print("Error ending call: \(error)")
             }
