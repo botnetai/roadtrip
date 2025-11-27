@@ -1,5 +1,25 @@
 # Logbook
 
+## 2025-11-27: Fix Railway duplicate config conflict
+
+**Issue**: Railway build failing with `cd backend: No such file or directory`
+
+**Root Cause**: Railway found two config files - `railway.json` AND `railway-node.json`. It used `railway.json` which pointed to root `nixpacks.toml` containing `cd backend && npm ci` commands. But since Railway dashboard has `Root Directory = backend`, we're already IN the backend directory - there's no nested backend folder.
+
+**Solution**: Deleted the conflicting root configs:
+- `railway.json` - was pointing to wrong nixpacks.toml
+- `nixpacks.toml` - had `cd backend` commands (designed for root deployment)
+
+Now only `railway-node.json` → `backend/nixpacks.toml` remains, which has correct commands without `cd backend` prefix.
+
+**Files Removed**:
+- `railway.json`
+- `nixpacks.toml`
+
+**Commit**: 84a67af
+
+---
+
 ## 2025-11-27: Fix iPad CallKit crash
 
 **Issue**: App Store review reported "error message after clicking on Start Call" on iPad Air (5th generation) with iPadOS 26.1.
