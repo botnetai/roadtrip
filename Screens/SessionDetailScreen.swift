@@ -189,7 +189,10 @@ struct SessionDetailScreen: View {
                     self.errorMessage = nil
                     self.isFetchingDetails = false
                 }
-                await syncSummaryToCloudKit(with: detail)
+                // Skip CloudKit for guests - local only
+                if !UserSettings.shared.isGuest {
+                    await syncSummaryToCloudKit(with: detail)
+                }
                 await MainActor.run {
                     handleAutoRefreshState(for: detail)
                 }

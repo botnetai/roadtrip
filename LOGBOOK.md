@@ -87,5 +87,8 @@ Now only `railway-node.json` → `backend/nixpacks.toml` remains, which has corr
 - `HybridSessionLogger.swift`: Skip CloudKit in startSession, endSession, loadSessions, fetchSession, deleteSession, deleteAllSessions
 - `AssistantCallCoordinator.swift`: Skip CloudKit sync in handleCallConnected and endAssistantCall
 - `SettingsScreen.swift`: Hide "Restore from iCloud" button for guests, show appropriate footer text
+- `SessionDetailScreen.swift`: Skip syncSummaryToCloudKit for guests
 
-**Commit**: Follow-up fix to ensure guest mode truly skips all CloudKit operations
+**Commits**:
+- `768f38b`: Fix guest mode to truly skip CloudKit (local-only)
+- Follow-up: SessionDetailScreen CloudKit guard
