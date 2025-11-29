@@ -86,6 +86,19 @@ class AuthService {
 
     var isAuthenticated: Bool {
         print("🔑 isAuthenticated called")
+
+        // For guest users, just need a device token (no Apple ID required)
+        if UserSettings.shared.isGuest {
+            if authToken == nil {
+                print("🔑 Guest user - generating device token...")
+                generateDeviceToken()
+            }
+            let hasToken = authToken != nil
+            print("🔑 Guest authentication: \(hasToken)")
+            return hasToken
+        }
+
+        // For signed-in users, require Apple ID
         guard appleUserID != nil else {
             print("❌ Apple ID not linked - user must sign in with Apple first")
             return false

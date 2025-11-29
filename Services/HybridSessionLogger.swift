@@ -164,7 +164,9 @@ class HybridSessionLogger: ObservableObject {
     // MARK: - Sync Status
 
     func checkSyncStatus() async -> String {
-        if await cloudKit.isICloudAvailable() {
+        if settings.isGuest {
+            return "Guest mode - sessions stored locally"
+        } else if await cloudKit.isICloudAvailable() {
             return "Syncing via iCloud"
         } else {
             return "iCloud unavailable - using backend only"

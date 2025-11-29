@@ -18,6 +18,12 @@ class UserSettings: ObservableObject {
         }
     }
 
+    @Published var isGuest: Bool {
+        didSet {
+            UserDefaults.standard.set(isGuest, forKey: "isGuest")
+        }
+    }
+
     @Published var retentionDays: Int {
         didSet {
             UserDefaults.standard.set(retentionDays, forKey: "retentionDays")
@@ -82,6 +88,8 @@ class UserSettings: ObservableObject {
         } else {
             self.isSignedIn = AuthService.shared.appleUserID != nil
         }
+
+        self.isGuest = UserDefaults.standard.bool(forKey: "isGuest")
 
         // Check if retentionDays key exists to distinguish between "not set" (default to 30) and "set to 0" (never delete)
         if UserDefaults.standard.object(forKey: "retentionDays") != nil {

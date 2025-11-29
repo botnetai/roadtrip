@@ -42,6 +42,24 @@ struct SignInScreen: View {
                 .frame(height: 50)
                 .disabled(isProcessing)
 
+                Button {
+                    continueAsGuest()
+                } label: {
+                    Text("Continue as Guest")
+                        .font(.body)
+                        .foregroundColor(.primary)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                        .background(Color(.systemGray5))
+                        .cornerRadius(8)
+                }
+                .disabled(isProcessing)
+
+                Text("Guest accounts have limited features. Sign in anytime to sync across devices.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+
                 if let error = errorMessage {
                     Text(error)
                         .font(.caption)
@@ -69,6 +87,13 @@ struct SignInScreen: View {
         .padding()
     }
 
+    private func continueAsGuest() {
+        settings.isGuest = true
+        settings.isSignedIn = true
+        // Generate device token for guest
+        _ = AuthService.shared.deviceIdentifier
+    }
+
     private func handleAuthorization(result: Result<ASAuthorization, Error>) {
         switch result {
         case .success(let authorization):
@@ -84,6 +109,7 @@ struct SignInScreen: View {
                 do {
                     try AuthService.shared.handleAppleSignIn(credential: credential)
                     await MainActor.run {
+                        settings.isGuest = false  // Clear guest status when signing in
                         settings.isSignedIn = true
                         isProcessing = false
                     }
