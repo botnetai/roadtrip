@@ -373,8 +373,8 @@ struct SettingsScreen: View {
     private var cloudBackupSection: some View {
         Section {
             HStack {
-                Image(systemName: syncStatus?.contains("Syncing via iCloud") == true ? "checkmark.icloud" : "icloud.slash")
-                    .foregroundColor(syncStatus?.contains("Syncing via iCloud") == true ? .green : .orange)
+                Image(systemName: settings.isGuest ? "icloud.slash" : (syncStatus?.contains("Syncing via iCloud") == true ? "checkmark.icloud" : "icloud.slash"))
+                    .foregroundColor(settings.isGuest ? .secondary : (syncStatus?.contains("Syncing via iCloud") == true ? .green : .orange))
                     .imageScale(.large)
 
                 VStack(alignment: .leading, spacing: 4) {
@@ -382,7 +382,11 @@ struct SettingsScreen: View {
                         .font(.subheadline)
                         .foregroundColor(.secondary)
 
-                    if let status = syncStatus {
+                    if settings.isGuest {
+                        Text("Guest mode - sessions stored locally")
+                            .font(.body)
+                            .foregroundColor(.secondary)
+                    } else if let status = syncStatus {
                         Text(status)
                             .font(.body)
                             .foregroundColor(status.contains("Syncing via iCloud") ? .primary : .secondary)
@@ -397,22 +401,29 @@ struct SettingsScreen: View {
             }
             .padding(.vertical, 4)
 
-            Button(action: restoreFromiCloud) {
-                HStack {
-                    if isRefreshing {
-                        ProgressView()
-                        Text("Restoring...")
-                    } else {
-                        Image(systemName: "arrow.clockwise.icloud")
-                        Text("Restore from iCloud")
+            // Hide restore button for guests
+            if !settings.isGuest {
+                Button(action: restoreFromiCloud) {
+                    HStack {
+                        if isRefreshing {
+                            ProgressView()
+                            Text("Restoring...")
+                        } else {
+                            Image(systemName: "arrow.clockwise.icloud")
+                            Text("Restore from iCloud")
+                        }
                     }
                 }
+                .disabled(isRefreshing || syncStatus?.contains("unavailable") == true)
             }
-            .disabled(isRefreshing || syncStatus?.contains("unavailable") == true)
         } header: {
             Text("Cloud Backup")
         } footer: {
-            Text("Sessions automatically sync across all your devices signed into the same iCloud account. Use restore to manually fetch the latest data from iCloud.")
+            if settings.isGuest {
+                Text("Sign in with Apple in the Account section to enable iCloud sync across devices.")
+            } else {
+                Text("Sessions automatically sync across all your devices signed into the same iCloud account. Use restore to manually fetch the latest data from iCloud.")
+            }
         }
     }
 
@@ -777,6 +788,9 @@ struct SettingsScreen: View {
     }
 
     private func restoreFromiCloud() {
+        // Guests don't use iCloud
+        guard !settings.isGuest else { return }
+
         isRefreshing = true
         restoreErrorMessage = nil
 

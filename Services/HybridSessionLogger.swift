@@ -39,6 +39,11 @@ class HybridSessionLogger: ObservableObject {
         // Always track on backend for usage/billing
         let response = try await backend.startSession(context: context)
 
+        // Skip CloudKit for guests - local only
+        guard !settings.isGuest else {
+            return response.sessionId
+        }
+
         // If CloudKit available, create session there too
         if await cloudKit.isICloudAvailable() {
             let session = Session(
@@ -61,13 +66,16 @@ class HybridSessionLogger: ObservableObject {
         // End on backend
         try await backend.endSession(sessionID: sessionID)
 
-        // Update in CloudKit if available
-        if await cloudKit.isICloudAvailable(),
-           let session = try? await cloudKit.fetchSession(id: sessionID) {
-            var updatedSession = session
-            updatedSession.endedAt = Date()
+        // Skip CloudKit for guests - local only
+        if !settings.isGuest {
+            // Update in CloudKit if available
+            if await cloudKit.isICloudAvailable(),
+               let session = try? await cloudKit.fetchSession(id: sessionID) {
+                var updatedSession = session
+                updatedSession.endedAt = Date()
 
-            try? await cloudKit.saveSession(updatedSession)
+                try? await cloudKit.saveSession(updatedSession)
+            }
         }
 
         // Reload to show updated session
@@ -81,6 +89,13 @@ class HybridSessionLogger: ObservableObject {
         error = nil
 
         do {
+            // Guests use backend only (no CloudKit sync)
+            if settings.isGuest {
+                sessions = try await backend.fetchSessions()
+                isLoading = false
+                return
+            }
+
             // Try CloudKit first (instant, offline-capable)
             if await cloudKit.isICloudAvailable() {
                 let cloudKitSessions = try await cloudKit.fetchSessions()
@@ -116,10 +131,13 @@ class HybridSessionLogger: ObservableObject {
     }
 
     func fetchSession(id: String) async throws -> Session? {
-        // Try CloudKit first (faster)
-        if await cloudKit.isICloudAvailable(),
-           let session = try? await cloudKit.fetchSession(id: id) {
-            return session
+        // Guests skip CloudKit
+        if !settings.isGuest {
+            // Try CloudKit first (faster)
+            if await cloudKit.isICloudAvailable(),
+               let session = try? await cloudKit.fetchSession(id: id) {
+                return session
+            }
         }
 
         // Fallback to backend detail (returns session metadata)
@@ -133,22 +151,28 @@ class HybridSessionLogger: ObservableObject {
     // MARK: - Deletion
 
     func deleteSession(id: String) async throws {
-        // Delete from both
+        // Delete from backend
         try await backend.deleteSession(sessionID: id)
 
-        if await cloudKit.isICloudAvailable() {
-            try? await cloudKit.deleteSession(id: id)
+        // Guests skip CloudKit
+        if !settings.isGuest {
+            if await cloudKit.isICloudAvailable() {
+                try? await cloudKit.deleteSession(id: id)
+            }
         }
 
         await loadSessions()
     }
 
     func deleteAllSessions() async throws {
-        // Delete from both
+        // Delete from backend
         try await backend.deleteAllSessions()
 
-        if await cloudKit.isICloudAvailable() {
-            try? await cloudKit.deleteAllSessions()
+        // Guests skip CloudKit
+        if !settings.isGuest {
+            if await cloudKit.isICloudAvailable() {
+                try? await cloudKit.deleteAllSessions()
+            }
         }
 
         sessions = []

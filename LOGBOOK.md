@@ -78,3 +78,14 @@ Now only `railway-node.json` → `backend/nixpacks.toml` remains, which has corr
 **Backend**: Already supports device-only tokens. No changes needed.
 
 **Build Status**: Verified iOS build succeeds
+
+### Fix 3: Ensure Guest Mode is Truly Local-Only
+
+**Issue**: Guest mode claimed "sessions stored locally" but CloudKit was still being used in multiple places.
+
+**Solution**: Guard all CloudKit operations with `!settings.isGuest`:
+- `HybridSessionLogger.swift`: Skip CloudKit in startSession, endSession, loadSessions, fetchSession, deleteSession, deleteAllSessions
+- `AssistantCallCoordinator.swift`: Skip CloudKit sync in handleCallConnected and endAssistantCall
+- `SettingsScreen.swift`: Hide "Restore from iCloud" button for guests, show appropriate footer text
+
+**Commit**: Follow-up fix to ensure guest mode truly skips all CloudKit operations
