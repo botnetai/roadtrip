@@ -8,6 +8,20 @@ import CallKit
 import AVFoundation
 import UIKit
 
+enum CallManagerError: LocalizedError {
+    case timeout
+    case audioSessionFailed(underlying: Error)
+
+    var errorDescription: String? {
+        switch self {
+        case .timeout:
+            return "Call setup timed out. Please try again."
+        case .audioSessionFailed(let error):
+            return "Could not configure audio: \(error.localizedDescription)"
+        }
+    }
+}
+
 protocol CallManagerDelegate: AnyObject {
     func callManagerDidConnect()
     func callManagerDidDisconnect()
@@ -33,6 +47,9 @@ class CallManager: NSObject {
     private let provider: CXProviderProtocol?
     private let callController: CXCallControllerProtocol?
     private var currentCallUUID: UUID?
+
+    /// Tracks if a call request timed out - used to ignore late CallKit callbacks
+    private var callRequestTimedOut = false
 
     /// iPad doesn't support CallKit, so we bypass it entirely on iPad
     private let isCallKitSupported: Bool
@@ -68,6 +85,9 @@ class CallManager: NSObject {
     }
 
     func startAssistantCall() {
+        // Reset timeout flag for new call attempt
+        callRequestTimedOut = false
+
         // On iPad, bypass CallKit entirely
         guard isCallKitSupported else {
             currentCallUUID = UUID()
@@ -82,7 +102,25 @@ class CallManager: NSObject {
 
         let transaction = CXTransaction(action: startCallAction)
 
+        // Add timeout protection - CallKit can hang on some devices
+        let timeoutWorkItem = DispatchWorkItem { [weak self] in
+            guard let self = self else { return }
+            // Only timeout if we haven't received a response yet
+            if self.currentCallUUID == nil {
+                print("CallKit request timed out after 10 seconds")
+                self.callRequestTimedOut = true
+                self.delegate?.callManagerDidFail(error: CallManagerError.timeout)
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 10, execute: timeoutWorkItem)
+
         callController?.request(transaction) { [weak self] error in
+            timeoutWorkItem.cancel()
+            // Ignore late responses if we already timed out
+            guard self?.callRequestTimedOut != true else {
+                print("Ignoring late CallKit response after timeout")
+                return
+            }
             if let error = error {
                 print("Error starting call: \(error)")
                 self?.delegate?.callManagerDidFail(error: error)
@@ -120,7 +158,7 @@ class CallManager: NSObject {
     
     private func configureAudioSession() {
         let audioSession = AVAudioSession.sharedInstance()
-        
+
         do {
             try audioSession.setCategory(
                 .playAndRecord,
@@ -133,10 +171,17 @@ class CallManager: NSObject {
                 ]
             )
             try audioSession.setActive(true)
-            try audioSession.overrideOutputAudioPort(.speaker)
+
+            // Speaker override can fail on some devices - don't fail the whole call
+            // The call can still work through earpiece or other audio routes
+            do {
+                try audioSession.overrideOutputAudioPort(.speaker)
+            } catch {
+                print("Warning: Could not override to speaker (non-fatal): \(error)")
+            }
         } catch {
             print("Error configuring audio session: \(error)")
-            delegate?.callManagerDidFail(error: error)
+            delegate?.callManagerDidFail(error: CallManagerError.audioSessionFailed(underlying: error))
         }
     }
     
@@ -153,6 +198,12 @@ class CallManager: NSObject {
 
 extension CallManager: CXProviderDelegate {
     func provider(_ provider: CXProvider, perform action: CXStartCallAction) {
+        // Ignore late CallKit callbacks if we already timed out
+        guard !callRequestTimedOut else {
+            print("Ignoring late CXStartCallAction after timeout")
+            action.fail()
+            return
+        }
         configureAudioSession()
         provider.reportOutgoingCall(with: action.callUUID, startedConnectingAt: Date())
         action.fulfill()

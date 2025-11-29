@@ -6,6 +6,7 @@
 import SwiftUI
 import AVFoundation
 import CloudKit
+import AuthenticationServices
 
 private struct RetentionOption: Identifiable {
     let value: Int
@@ -130,12 +131,22 @@ struct SettingsScreen: View {
             HStack {
                 Text("Status")
                 Spacer()
-                Text(settings.isSignedIn ? "Signed in" : "Not signed in")
-                    .font(.subheadline)
-                    .foregroundColor(settings.isSignedIn ? .green : .orange)
+                if settings.isGuest {
+                    Text("Guest")
+                        .font(.subheadline)
+                        .foregroundColor(.orange)
+                } else if settings.isSignedIn {
+                    Text("Signed in")
+                        .font(.subheadline)
+                        .foregroundColor(.green)
+                } else {
+                    Text("Not signed in")
+                        .font(.subheadline)
+                        .foregroundColor(.orange)
+                }
             }
 
-            if let identifier = formattedAppleIdentifier {
+            if !settings.isGuest, let identifier = formattedAppleIdentifier {
                 HStack {
                     Text("Apple Identifier")
                     Spacer()
@@ -145,19 +156,39 @@ struct SettingsScreen: View {
                 }
             }
 
-            Button(role: .destructive) {
-                showSignOutConfirmation = true
-            } label: {
-                HStack {
-                    Image(systemName: "rectangle.portrait.and.arrow.right")
-                    Text("Sign Out")
+            if settings.isGuest {
+                // Show Sign In button for guests
+                SignInWithAppleButton(.signIn) { request in
+                    request.requestedScopes = [.fullName, .email]
+                } onCompletion: { result in
+                    handleAppleSignIn(result: result)
                 }
+                .signInWithAppleButtonStyle(.black)
+                .frame(height: 44)
+
+                Text("Sign in to sync sessions across devices and restore purchases.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            } else {
+                // Show Sign Out button for signed-in users
+                Button(role: .destructive) {
+                    showSignOutConfirmation = true
+                } label: {
+                    HStack {
+                        Image(systemName: "rectangle.portrait.and.arrow.right")
+                        Text("Sign Out")
+                    }
+                }
+                .disabled(!settings.isSignedIn)
             }
-            .disabled(!settings.isSignedIn)
         } header: {
             Text("Account")
         } footer: {
-            Text("Signing out removes access to your synced sessions on this device until you sign in with Apple again.")
+            if settings.isGuest {
+                Text("You're using a guest account. Sessions are stored locally on this device only.")
+            } else {
+                Text("Signing out removes access to your synced sessions on this device until you sign in with Apple again.")
+            }
         }
     }
 
@@ -342,8 +373,8 @@ struct SettingsScreen: View {
     private var cloudBackupSection: some View {
         Section {
             HStack {
-                Image(systemName: syncStatus?.contains("Syncing via iCloud") == true ? "checkmark.icloud" : "icloud.slash")
-                    .foregroundColor(syncStatus?.contains("Syncing via iCloud") == true ? .green : .orange)
+                Image(systemName: settings.isGuest ? "icloud.slash" : (syncStatus?.contains("Syncing via iCloud") == true ? "checkmark.icloud" : "icloud.slash"))
+                    .foregroundColor(settings.isGuest ? .secondary : (syncStatus?.contains("Syncing via iCloud") == true ? .green : .orange))
                     .imageScale(.large)
 
                 VStack(alignment: .leading, spacing: 4) {
@@ -351,7 +382,11 @@ struct SettingsScreen: View {
                         .font(.subheadline)
                         .foregroundColor(.secondary)
 
-                    if let status = syncStatus {
+                    if settings.isGuest {
+                        Text("Guest mode - sessions stored locally")
+                            .font(.body)
+                            .foregroundColor(.secondary)
+                    } else if let status = syncStatus {
                         Text(status)
                             .font(.body)
                             .foregroundColor(status.contains("Syncing via iCloud") ? .primary : .secondary)
@@ -366,22 +401,29 @@ struct SettingsScreen: View {
             }
             .padding(.vertical, 4)
 
-            Button(action: restoreFromiCloud) {
-                HStack {
-                    if isRefreshing {
-                        ProgressView()
-                        Text("Restoring...")
-                    } else {
-                        Image(systemName: "arrow.clockwise.icloud")
-                        Text("Restore from iCloud")
+            // Hide restore button for guests
+            if !settings.isGuest {
+                Button(action: restoreFromiCloud) {
+                    HStack {
+                        if isRefreshing {
+                            ProgressView()
+                            Text("Restoring...")
+                        } else {
+                            Image(systemName: "arrow.clockwise.icloud")
+                            Text("Restore from iCloud")
+                        }
                     }
                 }
+                .disabled(isRefreshing || syncStatus?.contains("unavailable") == true)
             }
-            .disabled(isRefreshing || syncStatus?.contains("unavailable") == true)
         } header: {
             Text("Cloud Backup")
         } footer: {
-            Text("Sessions automatically sync across all your devices signed into the same iCloud account. Use restore to manually fetch the latest data from iCloud.")
+            if settings.isGuest {
+                Text("Sign in with Apple in the Account section to enable iCloud sync across devices.")
+            } else {
+                Text("Sessions automatically sync across all your devices signed into the same iCloud account. Use restore to manually fetch the latest data from iCloud.")
+            }
         }
     }
 
@@ -699,6 +741,27 @@ struct SettingsScreen: View {
         }
     }
 
+    private func handleAppleSignIn(result: Result<ASAuthorization, Error>) {
+        switch result {
+        case .success(let authorization):
+            guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential else {
+                return
+            }
+
+            do {
+                try AuthService.shared.handleAppleSignIn(credential: credential)
+                settings.isGuest = false
+                settings.isSignedIn = true
+            } catch {
+                // Silently fail - user can retry
+                print("Failed to sign in: \(error)")
+            }
+
+        case .failure(let error):
+            print("Apple Sign In failed: \(error)")
+        }
+    }
+
     private func deleteAccount() {
         Task {
             do {
@@ -725,6 +788,9 @@ struct SettingsScreen: View {
     }
 
     private func restoreFromiCloud() {
+        // Guests don't use iCloud
+        guard !settings.isGuest else { return }
+
         isRefreshing = true
         restoreErrorMessage = nil
 

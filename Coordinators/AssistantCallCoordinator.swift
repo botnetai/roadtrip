@@ -168,14 +168,16 @@ class AssistantCallCoordinator: ObservableObject {
                 do {
                     try await sessionLogger.endSession(sessionID: sessionID, durationMinutes: durationMinutes)
 
-                    // Update in CloudKit if available
-                    if await cloudKit.isICloudAvailable(),
-                       let session = try? await cloudKit.fetchSession(id: sessionID) {
-                        var updatedSession = session
-                        updatedSession.endedAt = Date()
-                        updatedSession.durationMinutes = durationMinutes
+                    // Update in CloudKit if available (skip for guests)
+                    if !UserSettings.shared.isGuest {
+                        if await cloudKit.isICloudAvailable(),
+                           let session = try? await cloudKit.fetchSession(id: sessionID) {
+                            var updatedSession = session
+                            updatedSession.endedAt = Date()
+                            updatedSession.durationMinutes = durationMinutes
 
-                        try? await cloudKit.saveSession(updatedSession)
+                            try? await cloudKit.saveSession(updatedSession)
+                        }
                     }
 
                     // Nothing else to do here - navigation already happened
@@ -249,18 +251,20 @@ class AssistantCallCoordinator: ObservableObject {
                 // Start session and get LiveKit credentials
                 let response = try await sessionLogger.startSession(context: context)
 
-                // Sync to CloudKit if available
-                if await cloudKit.isICloudAvailable() {
-                    let session = Session(
-                        id: response.sessionId,
-                        userId: "", // Will be set from backend response or iCloud user ID
-                        context: context,
-                        startedAt: Date(),
-                        endedAt: nil,
-                        loggingEnabledSnapshot: UserSettings.shared.loggingEnabled,
-                        summaryStatus: .pending
-                    )
-                    try? await cloudKit.saveSession(session)
+                // Sync to CloudKit if available (skip for guests)
+                if !UserSettings.shared.isGuest {
+                    if await cloudKit.isICloudAvailable() {
+                        let session = Session(
+                            id: response.sessionId,
+                            userId: "", // Will be set from backend response or iCloud user ID
+                            context: context,
+                            startedAt: Date(),
+                            endedAt: nil,
+                            loggingEnabledSnapshot: UserSettings.shared.loggingEnabled,
+                            summaryStatus: .pending
+                        )
+                        try? await cloudKit.saveSession(session)
+                    }
                 }
 
                 // Connect to LiveKit
