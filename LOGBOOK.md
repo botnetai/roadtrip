@@ -91,4 +91,4 @@ Now only `railway-node.json` → `backend/nixpacks.toml` remains, which has corr
 
 **Commits**:
 - `768f38b`: Fix guest mode to truly skip CloudKit (local-only)
-- Follow-up: SessionDetailScreen CloudKit guard
+- `68ee94c`: Guard SessionDetailScreen CloudKit sync for guests
