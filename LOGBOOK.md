@@ -56,8 +56,11 @@ Now only `railway-node.json` → `backend/nixpacks.toml` remains, which has corr
 - Added `CallManagerError` enum with `.timeout` and `.audioSessionFailed` cases
 - Made speaker override non-fatal (call continues through earpiece if speaker fails)
 - Added 10-second timeout protection for CallKit requests
+- Added `callRequestTimedOut` flag to prevent race condition where late CallKit callbacks could start a session after timeout failure
 
 **Files Changed**: `Services/CallManager.swift`
+
+**Commit**: `742e157` - Fix race condition: ignore late CallKit callbacks after timeout
 
 ### Fix 2: Guest Mode (Issues 1 & 2)
 
