@@ -51,7 +51,6 @@
 		A1B2C3D4E5F6A7B8C9D0E1F2 /* HapticFeedbackService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F6A7B8C9D0E1F2A3 /* HapticFeedbackService.swift */; };
 		C3D4E5F6A7B8C9D0E1F2A3B4 /* TimeFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E5F6A7B8C9D0E1F2A3B4C5 /* TimeFormatter.swift */; };
 		D6AEBBFBAA7C4BA88E7394B9 /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F17B3090761A4B06AEFC756F /* PaywallView.swift */; };
-		E1B2C3D4E5F6A7B8C9D0E1F1 /* SignInScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1B2C3D4E5F6A7B8C9D0E1F0 /* SignInScreen.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -121,7 +120,6 @@
 		B2C3D4E5F6A7B8C9D0E1F2A3 /* HapticFeedbackService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HapticFeedbackService.swift; sourceTree = "<group>"; };
 		D4E5F6A7B8C9D0E1F2A3B4C5 /* TimeFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeFormatter.swift; sourceTree = "<group>"; };
 		F17B3090761A4B06AEFC756F /* PaywallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
-		E1B2C3D4E5F6A7B8C9D0E1F0 /* SignInScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInScreen.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -191,7 +189,6 @@
 				A79AD2CD15C369F5E45DDE03 /* SettingsScreen.swift */,
 				DE765871A2DC4733B411C8CB /* CallScreen.swift */,
 				F17B3090761A4B06AEFC756F /* PaywallView.swift */,
-				E1B2C3D4E5F6A7B8C9D0E1F0 /* SignInScreen.swift */,
 			);
 			path = Screens;
 			sourceTree = "<group>";
@@ -462,7 +459,6 @@
 				A1B2C3D4E5F6A7B8C9D0E1F2 /* HapticFeedbackService.swift in Sources */,
 				C3D4E5F6A7B8C9D0E1F2A3B4 /* TimeFormatter.swift in Sources */,
 				D6AEBBFBAA7C4BA88E7394B9 /* PaywallView.swift in Sources */,
-				E1B2C3D4E5F6A7B8C9D0E1F1 /* SignInScreen.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

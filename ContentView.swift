@@ -12,38 +12,35 @@ struct ContentView: View {
     @State private var authAlertMessage: String?
     
     var body: some View {
-        Group {
-            if !settings.isSignedIn {
-                SignInScreen()
-            } else {
-                MainAppView()
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .authServiceDidSignOut)) { notification in
-            settings.isSignedIn = false
-            if let reason = notification.userInfo?["reason"] as? String {
-                authAlertMessage = reason
-            } else {
-                authAlertMessage = nil
-            }
-        }
-        .onChange(of: scenePhase) { _, newPhase in
-            if newPhase == .active {
-                AuthService.shared.validateCredentialState()
-            }
-        }
-        .alert("Sign In Required", isPresented: Binding(
-            get: { authAlertMessage != nil },
-            set: { newValue in
-                if !newValue {
+        MainAppView()
+            .onReceive(NotificationCenter.default.publisher(for: .authServiceDidSignOut)) { notification in
+                // Downgrade to guest mode instead of showing sign-in screen
+                if !settings.isGuest {
+                    settings.isGuest = true
+                }
+                if let reason = notification.userInfo?["reason"] as? String {
+                    authAlertMessage = reason
+                } else {
                     authAlertMessage = nil
                 }
             }
-        )) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(authAlertMessage ?? "Please sign in again.")
-        }
+            .onChange(of: scenePhase) { _, newPhase in
+                if newPhase == .active {
+                    AuthService.shared.validateCredentialState()
+                }
+            }
+            .alert("Session Expired", isPresented: Binding(
+                get: { authAlertMessage != nil },
+                set: { newValue in
+                    if !newValue {
+                        authAlertMessage = nil
+                    }
+                }
+            )) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(authAlertMessage ?? "You've been signed out. Sign in again from Settings to sync across devices.")
+            }
     }
 }
 

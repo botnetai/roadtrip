@@ -83,13 +83,21 @@ class UserSettings: ObservableObject {
     private init() {
         self.loggingEnabled = UserDefaults.standard.bool(forKey: "loggingEnabled")
         
-        if UserDefaults.standard.object(forKey: "isSignedIn") != nil {
-            self.isSignedIn = UserDefaults.standard.bool(forKey: "isSignedIn")
-        } else {
-            self.isSignedIn = AuthService.shared.appleUserID != nil
-        }
+        // Check if this is a first-time launch (no isSignedIn key exists)
+        let hasLaunchedBefore = UserDefaults.standard.object(forKey: "isSignedIn") != nil
 
-        self.isGuest = UserDefaults.standard.bool(forKey: "isGuest")
+        if hasLaunchedBefore {
+            // Returning user - preserve their state
+            self.isSignedIn = UserDefaults.standard.bool(forKey: "isSignedIn")
+            self.isGuest = UserDefaults.standard.bool(forKey: "isGuest")
+        } else {
+            // First launch - auto-start as guest (no sign-in screen)
+            // This fixes App Store rejection for Guideline 5.1.1
+            self.isSignedIn = true
+            self.isGuest = true
+            UserDefaults.standard.set(true, forKey: "isSignedIn")
+            UserDefaults.standard.set(true, forKey: "isGuest")
+        }
 
         // Check if retentionDays key exists to distinguish between "not set" (default to 30) and "set to 0" (never delete)
         if UserDefaults.standard.object(forKey: "retentionDays") != nil {
