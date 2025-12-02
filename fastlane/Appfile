@@ -1,0 +1,11 @@
+# App identifier (auto-detected from project if not set)
+# app_identifier ENV["APP_IDENTIFIER"] || "com.vanities.Roadtrip"
+
+# Apple ID for App Store Connect
+apple_id ENV["APPLE_ID"]
+
+# Developer Portal Team ID
+team_id ENV["TEAM_ID"] || "C4ZTUACCUP"
+
+# App Store Connect Team ID (usually same as team_id)
+itc_team_id ENV["ITC_TEAM_ID"] || ENV["TEAM_ID"] || "C4ZTUACCUP"

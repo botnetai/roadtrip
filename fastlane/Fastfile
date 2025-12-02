@@ -1,0 +1,41 @@
+default_platform(:ios)
+
+platform :ios do
+  desc "Build and upload to App Store Connect"
+  lane :release do
+    build
+    upload_to_app_store(
+      skip_metadata: true,
+      skip_screenshots: true,
+      precheck_include_in_app_purchases: false
+    )
+  end
+
+  desc "Build for App Store (no upload)"
+  lane :build do
+    # Auto-detect project or workspace
+    workspace = Dir["*.xcworkspace"].first
+    project = Dir["*.xcodeproj"].first
+    scheme = ENV["SCHEME"] || project&.gsub(".xcodeproj", "") || workspace&.gsub(".xcworkspace", "")
+
+    build_app(
+      workspace: workspace,
+      project: workspace ? nil : project,
+      scheme: scheme,
+      configuration: "Release",
+      export_method: "app-store",
+      clean: true
+    )
+  end
+
+  desc "Increment build number"
+  lane :bump do
+    increment_build_number
+  end
+
+  desc "Bump build, then build and upload"
+  lane :bump_release do
+    bump
+    release
+  end
+end
