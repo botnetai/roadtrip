@@ -15,6 +15,7 @@ struct ContentView: View {
         MainAppView()
             .onReceive(NotificationCenter.default.publisher(for: .authServiceDidSignOut)) { notification in
                 // Downgrade to guest mode instead of showing sign-in screen
+                // Keep isSignedIn=true so user stays in app; set isGuest=true to disable CloudKit sync
                 if !settings.isGuest {
                     settings.isGuest = true
                 }
@@ -39,7 +40,7 @@ struct ContentView: View {
             )) {
                 Button("OK", role: .cancel) {}
             } message: {
-                Text(authAlertMessage ?? "You've been signed out. Sign in again from Settings to sync across devices.")
+                Text(authAlertMessage ?? "Your session expired. Your data is safe. Sign in from Settings to sync across devices.")
             }
     }
 }

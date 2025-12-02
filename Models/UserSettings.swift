@@ -93,6 +93,7 @@ class UserSettings: ObservableObject {
         } else {
             // First launch - auto-start as guest (no sign-in screen)
             // This fixes App Store rejection for Guideline 5.1.1
+            // Note: didSet is not called during init, so we must persist explicitly
             self.isSignedIn = true
             self.isGuest = true
             UserDefaults.standard.set(true, forKey: "isSignedIn")
