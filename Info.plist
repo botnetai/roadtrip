@@ -41,6 +41,6 @@
     <key>NSCameraUsageDescription</key>
     <string>Camera access enables optional video during calls and future visual features.</string>
     <key>CFBundleVersion</key>
-    <string>34</string>
+    <string>35</string>
 </dict>
 </plist>
