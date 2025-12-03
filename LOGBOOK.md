@@ -1,5 +1,23 @@
 # Logbook
 
+## 2025-12-03: Fix iPad CallKit error with automatic fallback
+
+**Issue**: App Store rejected again with "Start Call" error on iPad Air (5th generation) with iPadOS 26.1. Error: `com.apple.CallKit.error.requesttransaction error 1`
+
+**Root Cause**: Device detection using `UIDevice.current.model` didn't reliably detect iPads in all scenarios (simulator, compatibility mode edge cases).
+
+**Solution**: Two-pronged approach:
+1. Keep the hardware model detection (`UIDevice.current.model.contains("iPad")`) as the first line of defense
+2. **New**: When CallKit fails for any reason, automatically fall back to non-CallKit mode instead of showing an error. This handles iPad, simulator, and any other CallKit issues gracefully.
+
+The fallback approach is more robust because it doesn't rely solely on device detection - if CallKit fails, the call still proceeds using direct audio session configuration.
+
+**Files Changed**: `Services/CallManager.swift`
+
+**Build Status**: Verified build succeeds for iOS Simulator
+
+---
+
 ## 2025-11-27: Fix Railway duplicate config conflict
 
 **Issue**: Railway build failing with `cd backend: No such file or directory`
