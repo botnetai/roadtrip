@@ -52,12 +52,16 @@ class CallManager: NSObject {
     private var callRequestTimedOut = false
 
     /// iPad doesn't support CallKit, so we bypass it entirely on iPad
+    /// Note: We check the actual hardware model, not userInterfaceIdiom, because
+    /// iPhone-only apps running on iPad in compatibility mode report idiom as .phone
     private let isCallKitSupported: Bool
 
     // Dependency injection for testing
     init(provider: CXProviderProtocol? = nil, callController: CXCallControllerProtocol? = nil) {
-        // CallKit is not supported on iPad - detect device type
-        self.isCallKitSupported = UIDevice.current.userInterfaceIdiom == .phone
+        // CallKit is not supported on iPad - detect actual hardware model
+        // UIDevice.current.model returns "iPad" for all iPad hardware regardless of compatibility mode
+        let isActuallyiPad = UIDevice.current.model.contains("iPad")
+        self.isCallKitSupported = !isActuallyiPad
 
         if let provider = provider, let callController = callController {
             // Test initialization
@@ -116,16 +120,22 @@ class CallManager: NSObject {
 
         callController?.request(transaction) { [weak self] error in
             timeoutWorkItem.cancel()
+            guard let self = self else { return }
             // Ignore late responses if we already timed out
-            guard self?.callRequestTimedOut != true else {
+            guard !self.callRequestTimedOut else {
                 print("Ignoring late CallKit response after timeout")
                 return
             }
             if let error = error {
                 print("Error starting call: \(error)")
-                self?.delegate?.callManagerDidFail(error: error)
+                // CallKit failed - fall back to non-CallKit mode automatically
+                // This handles iPad, simulator, and any other CallKit issues
+                print("Falling back to non-CallKit mode")
+                self.currentCallUUID = UUID()
+                self.configureAudioSession()
+                self.delegate?.callManagerDidConnect()
             } else {
-                self?.currentCallUUID = startCallAction.callUUID
+                self.currentCallUUID = startCallAction.callUUID
             }
         }
     }
