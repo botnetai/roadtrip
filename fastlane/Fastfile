@@ -13,6 +13,8 @@ platform :ios do
 
   desc "Build for App Store (no upload)"
   lane :build do
+    increment_build_number
+
     # Auto-detect project or workspace
     workspace = Dir["*.xcworkspace"].first
     project = Dir["*.xcodeproj"].first
@@ -33,9 +35,8 @@ platform :ios do
     increment_build_number
   end
 
-  desc "Bump build, then build and upload"
+  desc "Build and upload (deprecated: build now auto-increments)"
   lane :bump_release do
-    bump
     release
   end
 end
