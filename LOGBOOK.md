@@ -1,5 +1,21 @@
 # Logbook
 
+## 2025-12-05: Fix Railway deployment config file location
+
+**Issue**: Railway deployment failing with:
+- "service config at 'railway-node.json' not found" (Node service)
+- "config file railway-python.json does not exist" (Python service)
+
+**Root Cause**: Railway config files were in `config/` subdirectory but Railway was looking for them at the root.
+
+**Solution**: Moved config files from `config/` to root directory:
+- `config/railway-node.json` → `railway-node.json`
+- `config/railway-python.json` → `railway-python.json`
+
+These files reference `backend/nixpacks.toml` and `backend/nixpacks-agent.toml` which are paths relative to root.
+
+---
+
 ## 2025-12-03: Fix iPad CallKit error with automatic fallback
 
 **Issue**: App Store rejected again with "Start Call" error on iPad Air (5th generation) with iPadOS 26.1. Error: `com.apple.CallKit.error.requesttransaction error 1`
