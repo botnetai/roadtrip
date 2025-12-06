@@ -43,6 +43,18 @@ struct Configuration {
         return "\(apiBaseURL)/auth/refresh"
     }
 
+    var authRegisterURL: String {
+        return "\(apiBaseURL)/auth/register"
+    }
+
+    var authPasswordResetRequestURL: String {
+        return "\(apiBaseURL)/auth/password/reset-request"
+    }
+
+    var authPasswordResetURL: String {
+        return "\(apiBaseURL)/auth/password/reset"
+    }
+
     var isLoggingEnabled: Bool {
         switch AppEnvironment.current {
         case .development:

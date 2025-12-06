@@ -38,6 +38,7 @@ struct SettingsScreen: View {
     @State private var lastAllowedRetentionDays = UserSettings.shared.retentionDays
     @State private var showRetentionUpgradeAlert = false
     @State private var showSignOutConfirmation = false
+    @State private var showEmailAuth = false
 
     private let retentionOptions: [RetentionOption] = [
         RetentionOption(value: 0, title: "Never delete", isPro: true),
@@ -119,6 +120,12 @@ struct SettingsScreen: View {
         .sheet(isPresented: $showPaywall) {
             PaywallView()
         }
+        .sheet(isPresented: $showEmailAuth) {
+            EmailAuthView { token in
+                settings.isGuest = false
+                settings.isSignedIn = true
+            }
+        }
     }
 
     private var isProUser: Bool {
@@ -157,7 +164,7 @@ struct SettingsScreen: View {
             }
 
             if settings.isGuest {
-                // Show Sign In button for guests
+                // Show Sign In buttons for guests
                 SignInWithAppleButton(.signIn) { request in
                     request.requestedScopes = [.fullName, .email]
                 } onCompletion: { result in
@@ -165,6 +172,18 @@ struct SettingsScreen: View {
                 }
                 .signInWithAppleButtonStyle(.black)
                 .frame(height: 44)
+
+                Button {
+                    showEmailAuth = true
+                } label: {
+                    HStack {
+                        Image(systemName: "envelope.fill")
+                        Text("Sign in with Email")
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                }
+                .buttonStyle(.bordered)
 
                 Text("Sign in to sync sessions across devices and restore purchases.")
                     .font(.caption)

@@ -18,6 +18,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "bcrypt": "^6.0.0",
     "better-sqlite3": "^9.2.2",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
@@ -26,6 +27,7 @@
     "livekit-server-sdk": "^2.0.0",
     "node-jose": "^2.2.0",
     "openai": "^6.8.1",
-    "pg": "^8.16.3"
+    "pg": "^8.16.3",
+    "resend": "^6.5.2"
   }
 }

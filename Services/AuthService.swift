@@ -261,41 +261,183 @@ class AuthService {
         }
     }
     
-    func login(email: String, password: String) async throws -> String {
-        guard let url = URL(string: configuration.authLoginURL) else {
+    func register(email: String, password: String) async throws -> String {
+        guard let url = URL(string: configuration.authRegisterURL) else {
             throw AuthError.invalidURL
         }
-        
+
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
+
         let body: [String: Any] = [
             "email": email,
             "password": password
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        
+
         let (data, response) = try await URLSession.shared.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200...299).contains(httpResponse.statusCode) else {
+
+        guard let httpResponse = response as? HTTPURLResponse else {
             throw AuthError.authenticationFailed
         }
-        
+
+        // Handle specific error codes
+        if httpResponse.statusCode == 400 {
+            if let errorResponse = try? JSONDecoder().decode(AuthErrorResponse.self, from: data) {
+                switch errorResponse.error {
+                case "INVALID_EMAIL":
+                    throw AuthError.invalidEmail(errorResponse.message)
+                case "WEAK_PASSWORD":
+                    throw AuthError.weakPassword(errorResponse.message)
+                default:
+                    throw AuthError.registrationFailed(errorResponse.message)
+                }
+            }
+            throw AuthError.registrationFailed("Invalid request")
+        }
+
+        if httpResponse.statusCode == 409 {
+            throw AuthError.emailAlreadyExists
+        }
+
+        guard (200...299).contains(httpResponse.statusCode) else {
+            throw AuthError.registrationFailed("Registration failed")
+        }
+
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         decoder.dateDecodingStrategy = .iso8601
         let authResponse = try decoder.decode(AuthResponse.self, from: data)
-        
+
         authToken = authResponse.token
         if let expiry = authResponse.expiresAt {
             UserDefaults.standard.set(expiry, forKey: tokenExpiryKey)
         }
-        
+
+        print("Account created successfully for email: \(email)")
         return authResponse.token
     }
-    
+
+    func login(email: String, password: String) async throws -> String {
+        guard let url = URL(string: configuration.authLoginURL) else {
+            throw AuthError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let body: [String: Any] = [
+            "email": email,
+            "password": password
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw AuthError.authenticationFailed
+        }
+
+        // Handle rate limiting
+        if httpResponse.statusCode == 429 {
+            if let errorResponse = try? JSONDecoder().decode(AuthErrorResponse.self, from: data) {
+                throw AuthError.rateLimited(retryAfter: errorResponse.retryAfter ?? 900)
+            }
+            throw AuthError.rateLimited(retryAfter: 900)
+        }
+
+        // Handle invalid credentials
+        if httpResponse.statusCode == 401 {
+            throw AuthError.invalidCredentials
+        }
+
+        guard (200...299).contains(httpResponse.statusCode) else {
+            throw AuthError.authenticationFailed
+        }
+
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        decoder.dateDecodingStrategy = .iso8601
+        let authResponse = try decoder.decode(AuthResponse.self, from: data)
+
+        authToken = authResponse.token
+        if let expiry = authResponse.expiresAt {
+            UserDefaults.standard.set(expiry, forKey: tokenExpiryKey)
+        }
+
+        return authResponse.token
+    }
+
+    func requestPasswordReset(email: String) async throws {
+        guard let url = URL(string: configuration.authPasswordResetRequestURL) else {
+            throw AuthError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let body: [String: Any] = ["email": email]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (_, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200...299).contains(httpResponse.statusCode) else {
+            throw AuthError.passwordResetFailed("Failed to send password reset email")
+        }
+
+        print("Password reset email requested for: \(email)")
+    }
+
+    func resetPassword(token: String, newPassword: String) async throws {
+        guard let url = URL(string: configuration.authPasswordResetURL) else {
+            throw AuthError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let body: [String: Any] = [
+            "token": token,
+            "new_password": newPassword
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw AuthError.passwordResetFailed("Network error")
+        }
+
+        if httpResponse.statusCode == 400 {
+            if let errorResponse = try? JSONDecoder().decode(AuthErrorResponse.self, from: data) {
+                switch errorResponse.error {
+                case "INVALID_TOKEN":
+                    throw AuthError.invalidResetToken
+                case "TOKEN_EXPIRED":
+                    throw AuthError.resetTokenExpired
+                case "TOKEN_USED":
+                    throw AuthError.resetTokenUsed
+                case "WEAK_PASSWORD":
+                    throw AuthError.weakPassword(errorResponse.message)
+                default:
+                    throw AuthError.passwordResetFailed(errorResponse.message)
+                }
+            }
+            throw AuthError.passwordResetFailed("Invalid request")
+        }
+
+        guard (200...299).contains(httpResponse.statusCode) else {
+            throw AuthError.passwordResetFailed("Failed to reset password")
+        }
+
+        print("Password reset successful")
+    }
+
     func logout(reason: String? = nil) {
         authToken = nil
         appleUserID = nil
@@ -395,7 +537,17 @@ enum AuthError: LocalizedError {
     case authenticationFailed
     case tokenExpired
     case notImplemented
-    
+    case invalidEmail(String)
+    case weakPassword(String)
+    case emailAlreadyExists
+    case registrationFailed(String)
+    case invalidCredentials
+    case rateLimited(retryAfter: Int)
+    case passwordResetFailed(String)
+    case invalidResetToken
+    case resetTokenExpired
+    case resetTokenUsed
+
     var errorDescription: String? {
         switch self {
         case .invalidURL:
@@ -406,7 +558,40 @@ enum AuthError: LocalizedError {
             return "Your session has expired. Please log in again."
         case .notImplemented:
             return "Token refresh not yet implemented"
+        case .invalidEmail(let message):
+            return message
+        case .weakPassword(let message):
+            return message
+        case .emailAlreadyExists:
+            return "An account with this email already exists. Please sign in instead."
+        case .registrationFailed(let message):
+            return message
+        case .invalidCredentials:
+            return "Invalid email or password. Please try again."
+        case .rateLimited(let retryAfter):
+            let minutes = retryAfter / 60
+            return "Too many login attempts. Please try again in \(minutes) minutes."
+        case .passwordResetFailed(let message):
+            return message
+        case .invalidResetToken:
+            return "This password reset link is invalid. Please request a new one."
+        case .resetTokenExpired:
+            return "This password reset link has expired. Please request a new one."
+        case .resetTokenUsed:
+            return "This password reset link has already been used. Please request a new one."
         }
+    }
+}
+
+struct AuthErrorResponse: Codable {
+    let error: String
+    let message: String
+    let retryAfter: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case error
+        case message
+        case retryAfter = "retry_after"
     }
 }
 

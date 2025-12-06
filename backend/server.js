@@ -28,9 +28,145 @@ import db, { usePostgres } from './database.js';
 import { generateRoomName, generateLiveKitToken, getLiveKitUrl, logLiveKitConfig, dispatchAgentToRoom, getAgentName } from './livekit.js';
 import iapRoutes from './routes/iap.js';
 import { checkEntitlement, incrementFreeTierUsage, FREE_TIER_MINUTES } from './middleware/entitlementCheck.js';
+import bcrypt from 'bcrypt';
+import { sendPasswordResetEmail } from './services/email.js';
+
+// In-memory rate limiting for login attempts
+// Key: email, Value: { attempts: number, lastAttempt: Date, lockedUntil: Date | null }
+const loginAttempts = new Map();
+const RATE_LIMIT_MAX_ATTEMPTS = 5;
+const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+
+function checkLoginRateLimit(email) {
+  const normalizedEmail = email.toLowerCase().trim();
+  const now = Date.now();
+  const record = loginAttempts.get(normalizedEmail);
+
+  if (!record) {
+    return { allowed: true, attemptsRemaining: RATE_LIMIT_MAX_ATTEMPTS };
+  }
+
+  // If locked, check if lock has expired
+  if (record.lockedUntil && now < record.lockedUntil) {
+    const retryAfter = Math.ceil((record.lockedUntil - now) / 1000);
+    return { allowed: false, retryAfter, reason: 'RATE_LIMITED' };
+  }
+
+  // If lock expired, reset the record
+  if (record.lockedUntil && now >= record.lockedUntil) {
+    loginAttempts.delete(normalizedEmail);
+    return { allowed: true, attemptsRemaining: RATE_LIMIT_MAX_ATTEMPTS };
+  }
+
+  // Check if attempts are within window
+  if (now - record.lastAttempt > RATE_LIMIT_WINDOW_MS) {
+    // Window expired, reset
+    loginAttempts.delete(normalizedEmail);
+    return { allowed: true, attemptsRemaining: RATE_LIMIT_MAX_ATTEMPTS };
+  }
+
+  const attemptsRemaining = RATE_LIMIT_MAX_ATTEMPTS - record.attempts;
+  return { allowed: attemptsRemaining > 0, attemptsRemaining: Math.max(0, attemptsRemaining) };
+}
+
+function recordLoginAttempt(email, success) {
+  const normalizedEmail = email.toLowerCase().trim();
+  const now = Date.now();
+
+  if (success) {
+    // Clear attempts on successful login
+    loginAttempts.delete(normalizedEmail);
+    return;
+  }
+
+  const record = loginAttempts.get(normalizedEmail) || { attempts: 0, lastAttempt: now, lockedUntil: null };
+  record.attempts += 1;
+  record.lastAttempt = now;
+
+  if (record.attempts >= RATE_LIMIT_MAX_ATTEMPTS) {
+    record.lockedUntil = now + RATE_LIMIT_WINDOW_MS;
+    console.log(`Rate limit triggered for ${normalizedEmail}, locked for 15 minutes`);
+  }
+
+  loginAttempts.set(normalizedEmail, record);
+}
+
+// Password validation helper
+// Requirements: 8+ chars, at least one uppercase, one lowercase, one number
+function validatePassword(password) {
+  if (!password || typeof password !== 'string') {
+    return { valid: false, error: 'Password is required' };
+  }
+  if (password.length < 8) {
+    return { valid: false, error: 'Password must be at least 8 characters' };
+  }
+  if (!/[A-Z]/.test(password)) {
+    return { valid: false, error: 'Password must contain at least one uppercase letter' };
+  }
+  if (!/[a-z]/.test(password)) {
+    return { valid: false, error: 'Password must contain at least one lowercase letter' };
+  }
+  if (!/[0-9]/.test(password)) {
+    return { valid: false, error: 'Password must contain at least one number' };
+  }
+  return { valid: true };
+}
+
+// Email validation helper
+function validateEmail(email) {
+  if (!email || typeof email !== 'string') {
+    return { valid: false, error: 'Email is required' };
+  }
+  // Basic RFC 5322 compliant regex
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return { valid: false, error: 'Please enter a valid email address' };
+  }
+  return { valid: true };
+}
 
 // Log LiveKit configuration after env is loaded and modules are imported
 logLiveKitConfig();
+
+// Seed App Store review test account on startup
+async function seedTestAccount() {
+  const testEmail = 'jjeremycai@gmail.com';
+  const testPassword = 'helloapplefriend';
+  const testUserId = 'user-test-account-001';
+
+  try {
+    // Check if test account already exists
+    const checkStmt = db.prepare('SELECT id FROM users WHERE email = ?');
+    const existingUser = await checkStmt.get(testEmail);
+
+    if (existingUser) {
+      console.log('✅ Test account already exists');
+      return;
+    }
+
+    // Hash password with bcrypt (cost 12)
+    const passwordHash = await bcrypt.hash(testPassword, 12);
+
+    // Insert test account
+    const insertStmt = db.prepare(`
+      INSERT INTO users (id, email, password_hash, email_verified, created_at, updated_at)
+      VALUES (?, ?, ?, ${usePostgres ? 'true' : '1'}, ${usePostgres ? 'NOW()' : "datetime('now')"}, ${usePostgres ? 'NOW()' : "datetime('now')"})
+    `);
+    await insertStmt.run(testUserId, testEmail, passwordHash);
+
+    console.log('✅ Test account seeded successfully (jjeremycai@gmail.com)');
+  } catch (error) {
+    // If error is duplicate key, account already exists
+    if (error.message?.includes('UNIQUE') || error.message?.includes('duplicate')) {
+      console.log('✅ Test account already exists');
+    } else {
+      console.error('⚠️ Failed to seed test account:', error.message);
+    }
+  }
+}
+
+// Run seeding on startup (after a short delay to ensure DB is ready)
+setTimeout(seedTestAccount, 1000);
 
 const logTtsProviderConfig = () => {
   const cartesia = process.env.CARTESIA_API_KEY;
@@ -363,6 +499,42 @@ const authenticateToken = async (req, res, next) => {
     req.deviceId = 'device_test_account_001';
     next();
     return;
+  }
+
+  // Demo mode for App Store review (expired subscription flow)
+  if (token === 'demo_expired_subscription_token') {
+    console.log('🎭 Demo mode authenticated - expired subscription user');
+    req.userId = 'user-demo-expired-001';
+    req.deviceId = 'device_demo_expired_001';
+    req.isDemo = true;
+    next();
+    return;
+  }
+
+  // Check if token belongs to an email user (tokens start with "email_")
+  if (token.startsWith('email_')) {
+    // Email token format: email_{userId}_{timestamp}
+    const parts = token.split('_');
+    if (parts.length >= 2) {
+      const userId = parts[1];
+      // Verify user exists in users table
+      try {
+        const userStmt = db.prepare('SELECT id FROM users WHERE id = ?');
+        const user = await userStmt.get(userId);
+        if (user) {
+          req.userId = userId;
+          req.deviceId = req.headers['x-device-id'] || token;
+          req.isEmailUser = true;
+          console.log(`✅ Email user authenticated: ${userId}`);
+          next();
+          return;
+        }
+      } catch (error) {
+        console.error('Error validating email token:', error);
+      }
+    }
+    // Invalid email token
+    return res.status(401).json({ error: 'Invalid token' });
   }
 
   // Accept any token (device tokens start with "device_", JWT tokens are longer)
@@ -1049,39 +1221,302 @@ app.delete('/v1/sessions/:id', authenticateToken, (req, res) => {
   }
 });
 
-// 9. POST /v1/auth/login - Simple login (returns mock token)
-app.post('/v1/auth/login', (req, res) => {
+// Demo mode endpoint for App Store review
+// Returns a short-lived token for a demo account with expired subscription
+app.post('/v1/auth/demo', async (req, res) => {
+  try {
+    const demoToken = 'demo_expired_subscription_token';
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 1 hour
+
+    console.log('🎭 Demo mode token issued for App Store review');
+    res.json({
+      token: demoToken,
+      expires_at: expiresAt,
+      is_demo: true
+    });
+  } catch (error) {
+    console.error('Demo auth error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /v1/auth/register - Register new user with email and password
+app.post('/v1/auth/register', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // Validate email
+    const emailValidation = validateEmail(email);
+    if (!emailValidation.valid) {
+      return res.status(400).json({
+        error: 'INVALID_EMAIL',
+        message: emailValidation.error
+      });
+    }
+
+    // Validate password
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.valid) {
+      return res.status(400).json({
+        error: 'WEAK_PASSWORD',
+        message: passwordValidation.error
+      });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Check if email already exists
+    const checkStmt = db.prepare('SELECT id FROM users WHERE email = ?');
+    const existingUser = await checkStmt.get(normalizedEmail);
+
+    if (existingUser) {
+      return res.status(409).json({
+        error: 'EMAIL_EXISTS',
+        message: 'An account with this email already exists'
+      });
+    }
+
+    // Hash password with bcrypt (cost 12)
+    const passwordHash = await bcrypt.hash(password, 12);
+
+    // Create user
+    const userId = crypto.randomUUID();
+    const insertStmt = db.prepare(`
+      INSERT INTO users (id, email, password_hash, email_verified, created_at, updated_at)
+      VALUES (?, ?, ?, ${usePostgres ? 'false' : '0'}, ${usePostgres ? 'NOW()' : "datetime('now')"}, ${usePostgres ? 'NOW()' : "datetime('now')"})
+    `);
+    await insertStmt.run(userId, normalizedEmail, passwordHash);
+
+    // Generate token
+    const token = `email_${userId}_${Date.now()}`;
+    const expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(); // 1 year
+
+    console.log(`✅ New user registered: ${normalizedEmail} (${userId})`);
+
+    res.status(201).json({
+      token,
+      expires_at: expiresAt,
+      user: {
+        id: userId,
+        email: normalizedEmail,
+        email_verified: false,
+        created_at: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    console.error('Register error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /v1/auth/login - Login with email and password
+app.post('/v1/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({ error: 'Missing credentials' });
-    }
-
-    // Special handling for App Store review test account
-    if (email === 'jjeremycai@gmail.com' && password === 'helloapplefriend') {
-      // Use a predefined token that maps to our test user
-      const testToken = 'test_account_token_for_app_store_review';
-      const expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(); // 1 year
-
-      console.log('✅ App Store review test account login successful');
-      res.json({
-        token: testToken,
-        expires_at: expiresAt
+      return res.status(400).json({
+        error: 'MISSING_CREDENTIALS',
+        message: 'Email and password are required'
       });
-      return;
     }
 
-    // Mock auth for other users - in production, validate against real user database
-    const token = Buffer.from(`${email}:${Date.now()}`).toString('base64');
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24 hours
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Check rate limit
+    const rateCheck = checkLoginRateLimit(normalizedEmail);
+    if (!rateCheck.allowed) {
+      return res.status(429).json({
+        error: 'RATE_LIMITED',
+        message: 'Too many login attempts. Please try again in 15 minutes.',
+        retry_after: rateCheck.retryAfter
+      });
+    }
+
+    // Find user by email
+    const userStmt = db.prepare('SELECT id, email, password_hash, email_verified, created_at FROM users WHERE email = ?');
+    const user = await userStmt.get(normalizedEmail);
+
+    if (!user) {
+      // Record failed attempt but return generic error
+      recordLoginAttempt(normalizedEmail, false);
+      return res.status(401).json({
+        error: 'INVALID_CREDENTIALS',
+        message: 'Invalid email or password'
+      });
+    }
+
+    // Compare password with bcrypt
+    const passwordMatch = await bcrypt.compare(password, user.password_hash);
+
+    if (!passwordMatch) {
+      recordLoginAttempt(normalizedEmail, false);
+      return res.status(401).json({
+        error: 'INVALID_CREDENTIALS',
+        message: 'Invalid email or password'
+      });
+    }
+
+    // Success - clear rate limit and update last_login_at
+    recordLoginAttempt(normalizedEmail, true);
+
+    const updateStmt = db.prepare(`UPDATE users SET last_login_at = ${usePostgres ? 'NOW()' : "datetime('now')"} WHERE id = ?`);
+    await updateStmt.run(user.id);
+
+    // Generate token
+    const token = `email_${user.id}_${Date.now()}`;
+    const expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(); // 1 year
+
+    console.log(`✅ User login successful: ${normalizedEmail}`);
 
     res.json({
       token,
-      expires_at: expiresAt
+      expires_at: expiresAt,
+      user: {
+        id: user.id,
+        email: user.email,
+        email_verified: usePostgres ? user.email_verified : !!user.email_verified,
+        created_at: normalizeTimestamp(user.created_at)
+      }
     });
   } catch (error) {
     console.error('Login error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /v1/auth/password/reset-request - Request password reset email
+app.post('/v1/auth/password/reset-request', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        error: 'MISSING_EMAIL',
+        message: 'Email is required'
+      });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Always return success to prevent email enumeration
+    // But only actually send email if user exists
+    const userStmt = db.prepare('SELECT id, email FROM users WHERE email = ?');
+    const user = await userStmt.get(normalizedEmail);
+
+    if (user) {
+      // Generate secure token
+      const token = crypto.randomBytes(32).toString('hex');
+      const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+      // Invalidate any existing tokens for this user
+      const invalidateStmt = db.prepare(`UPDATE password_reset_tokens SET used_at = ${usePostgres ? 'NOW()' : "datetime('now')"} WHERE user_id = ? AND used_at IS NULL`);
+      await invalidateStmt.run(user.id);
+
+      // Store new token
+      const tokenId = crypto.randomUUID();
+      const insertStmt = db.prepare(`
+        INSERT INTO password_reset_tokens (id, user_id, token_hash, expires_at, created_at)
+        VALUES (?, ?, ?, ?, ${usePostgres ? 'NOW()' : "datetime('now')"})
+      `);
+      await insertStmt.run(tokenId, user.id, tokenHash, expiresAt.toISOString());
+
+      // Send email
+      const emailResult = await sendPasswordResetEmail(user.email, token);
+      if (!emailResult.success) {
+        console.warn(`Failed to send password reset email to ${user.email}: ${emailResult.error}`);
+      } else {
+        console.log(`Password reset email sent to ${user.email}`);
+      }
+    } else {
+      console.log(`Password reset requested for non-existent email: ${normalizedEmail}`);
+    }
+
+    // Always return success to prevent email enumeration
+    res.json({
+      message: 'If an account exists with this email, you will receive a password reset link shortly.'
+    });
+  } catch (error) {
+    console.error('Password reset request error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /v1/auth/password/reset - Reset password with token
+app.post('/v1/auth/password/reset', async (req, res) => {
+  try {
+    const { token, new_password } = req.body;
+
+    if (!token || !new_password) {
+      return res.status(400).json({
+        error: 'MISSING_FIELDS',
+        message: 'Token and new password are required'
+      });
+    }
+
+    // Validate new password
+    const passwordValidation = validatePassword(new_password);
+    if (!passwordValidation.valid) {
+      return res.status(400).json({
+        error: 'WEAK_PASSWORD',
+        message: passwordValidation.error
+      });
+    }
+
+    // Hash the token and look it up
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+    const tokenStmt = db.prepare(`
+      SELECT prt.id, prt.user_id, prt.expires_at, prt.used_at, u.email
+      FROM password_reset_tokens prt
+      JOIN users u ON prt.user_id = u.id
+      WHERE prt.token_hash = ?
+    `);
+    const tokenRecord = await tokenStmt.get(tokenHash);
+
+    if (!tokenRecord) {
+      return res.status(400).json({
+        error: 'INVALID_TOKEN',
+        message: 'This password reset link is invalid or has expired.'
+      });
+    }
+
+    // Check if token is expired
+    const expiresAt = new Date(tokenRecord.expires_at);
+    if (expiresAt < new Date()) {
+      return res.status(400).json({
+        error: 'TOKEN_EXPIRED',
+        message: 'This password reset link has expired. Please request a new one.'
+      });
+    }
+
+    // Check if token is already used
+    if (tokenRecord.used_at) {
+      return res.status(400).json({
+        error: 'TOKEN_USED',
+        message: 'This password reset link has already been used. Please request a new one.'
+      });
+    }
+
+    // Hash new password
+    const passwordHash = await bcrypt.hash(new_password, 12);
+
+    // Update password
+    const updateUserStmt = db.prepare(`UPDATE users SET password_hash = ?, updated_at = ${usePostgres ? 'NOW()' : "datetime('now')"} WHERE id = ?`);
+    await updateUserStmt.run(passwordHash, tokenRecord.user_id);
+
+    // Mark token as used
+    const markUsedStmt = db.prepare(`UPDATE password_reset_tokens SET used_at = ${usePostgres ? 'NOW()' : "datetime('now')"} WHERE id = ?`);
+    await markUsedStmt.run(tokenRecord.id);
+
+    console.log(`Password reset successful for ${tokenRecord.email}`);
+
+    res.json({
+      message: 'Password reset successful. You can now sign in with your new password.'
+    });
+  } catch (error) {
+    console.error('Password reset error:', error);
     res.status(500).json({ error: error.message });
   }
 });

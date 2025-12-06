@@ -1,0 +1,322 @@
+openapi: 3.0.3
+info:
+  title: Email & Password Authentication API
+  version: 1.0.0
+  description: API endpoints for email/password authentication in Roadtrip app
+
+servers:
+  - url: https://api.roadtrip.app
+    description: Production
+  - url: http://localhost:3000
+    description: Local development
+
+paths:
+  /v1/auth/register:
+    post:
+      summary: Register new user with email and password
+      operationId: registerUser
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Invalid input (email format, password requirements)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalid_email:
+                  value:
+                    error: INVALID_EMAIL
+                    message: Please enter a valid email address
+                weak_password:
+                  value:
+                    error: WEAK_PASSWORD
+                    message: Password must be at least 8 characters with uppercase, lowercase, and number
+        '409':
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: EMAIL_EXISTS
+                message: An account with this email already exists
+
+  /v1/auth/login:
+    post:
+      summary: Login with email and password
+      operationId: loginUser
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: INVALID_CREDENTIALS
+                message: Invalid email or password
+        '429':
+          description: Too many login attempts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: RATE_LIMITED
+                message: Too many login attempts. Please try again in 15 minutes.
+                retry_after: 900
+
+  /v1/auth/password/reset-request:
+    post:
+      summary: Request password reset email
+      operationId: requestPasswordReset
+      tags:
+        - Password Reset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordResetRequest'
+      responses:
+        '200':
+          description: Reset email sent (always returns 200 to prevent email enumeration)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: If an account exists with this email, you will receive a password reset link.
+
+  /v1/auth/password/reset:
+    post:
+      summary: Reset password using token from email
+      operationId: resetPassword
+      tags:
+        - Password Reset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordResetConfirm'
+      responses:
+        '200':
+          description: Password reset successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Password has been reset. Please sign in with your new password.
+        '400':
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                expired:
+                  value:
+                    error: TOKEN_EXPIRED
+                    message: This reset link has expired. Please request a new one.
+                invalid:
+                  value:
+                    error: INVALID_TOKEN
+                    message: This reset link is invalid. Please request a new one.
+
+  /v1/auth/password/change:
+    post:
+      summary: Change password (authenticated)
+      operationId: changePassword
+      tags:
+        - Password Reset
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordChangeRequest'
+      responses:
+        '200':
+          description: Password changed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Password changed successfully.
+        '401':
+          description: Current password incorrect
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+
+  schemas:
+    RegisterRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          description: User's email address
+          example: user@example.com
+        password:
+          type: string
+          format: password
+          minLength: 8
+          description: Password (min 8 chars, 1 uppercase, 1 lowercase, 1 number)
+          example: MyPassword123
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        password:
+          type: string
+          format: password
+          example: MyPassword123
+
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: Bearer token for authentication
+          example: eyJhbGciOiJIUzI1NiIs...
+        expires_at:
+          type: string
+          format: date-time
+          description: Token expiration time
+          example: "2025-12-07T16:00:00Z"
+        user:
+          $ref: '#/components/schemas/User'
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: 550e8400-e29b-41d4-a716-446655440000
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        email_verified:
+          type: boolean
+          example: false
+        created_at:
+          type: string
+          format: date-time
+
+    PasswordResetRequest:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+          example: user@example.com
+
+    PasswordResetConfirm:
+      type: object
+      required:
+        - token
+        - password
+      properties:
+        token:
+          type: string
+          description: Reset token from email link
+          example: 550e8400-e29b-41d4-a716-446655440000
+        password:
+          type: string
+          format: password
+          minLength: 8
+          description: New password
+          example: NewPassword456
+
+    PasswordChangeRequest:
+      type: object
+      required:
+        - current_password
+        - new_password
+      properties:
+        current_password:
+          type: string
+          format: password
+          example: MyPassword123
+        new_password:
+          type: string
+          format: password
+          minLength: 8
+          example: NewPassword456
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error code
+          example: INVALID_CREDENTIALS
+        message:
+          type: string
+          description: Human-readable error message
+          example: Invalid email or password
+        retry_after:
+          type: integer
+          description: Seconds until retry allowed (for rate limiting)
+          example: 900
